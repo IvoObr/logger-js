@@ -1,5 +1,5 @@
 {
-  "name": "simple-logger-js",
+  "name": "logger-mogger-js",
   "version": "1.0.0",
   "description": "Simple JS logger",
   "main": "index.js",
