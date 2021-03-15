@@ -1,0 +1,27 @@
+{
+  "name": "logger-js",
+  "version": "1.0.0",
+  "description": "Simple JS logger",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IvoObr/logger-js.git"
+  },
+  "author": "IvoObr",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/IvoObr/logger-js/issues"
+  },
+  "homepage": "https://github.com/IvoObr/logger-js#readme",
+  "dependencies": {
+    "colors": "^1.4.0",
+    "typescript": "^4.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^14.14.35"
+  }
+}
