@@ -16,7 +16,7 @@ export interface ILogOptions {
 
 class logger {
 
-    private logFileName: string = 'logger.log';
+    private logFileName: string = 'logger-mogger.log';
     private writeInFile: boolean = true;
 
     constructor(options?: ILogOptions) {
@@ -74,7 +74,7 @@ class logger {
         console.log(`${time} ${colorFn(level.prefix).bold} ${colorFn(msg as string)}`);
          
         if (this.writeInFile) {   
-            this.writeToFile(`${time} ${level.prefix}: ${msg += '\r\n'}`); 
+            this.writeToFile(`${time} ${level.prefix} ${msg += '\r\n'}`); 
         }
     }
 
