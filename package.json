@@ -1,6 +1,6 @@
 {
-  "name": "logger-mogger-js",
-  "version": "1.0.1",
+  "name": "@7dev-works/logger-mogger-js",
+  "version": "1.0.2",
   "description": "Simple JS logger",
   "main": "index.js",
   "scripts": {
