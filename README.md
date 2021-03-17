@@ -1,2 +1,2 @@
-# logger-js
+# logger-mogger-js
 Simple JS logger
