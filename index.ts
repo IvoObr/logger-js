@@ -33,11 +33,11 @@ const BGcyan: string = "\x1b[46m";
 const BGwhite: string = "\x1b[47m";
 
  enum call {
-    info = 'info', 
-    warn = 'warn',
-    trace = 'trace',
-    error = 'error',
-    success = 'success',
+    info = 'INFO',
+    warn = 'WARN',
+    trace = 'TRACE',
+    error = 'ERROR',
+    success = 'SUCCESS'
 } 
 // const bold: string = "\033[0m";
 
@@ -71,70 +71,30 @@ class logger {
 
     private isNode = (): boolean => (process && true)
 
-    private middleware(method: call, args: any[]): void {
-        
-        switch (method) {
-            case call.info:
-                if (this.isNode()) {
-                    
-                } else {
-                    
-                }
-                break;
-            case call.warn:
-                if (this.isNode()) {
-                    
-                } else {
-                    
-                }
-                break;
-            case call.trace:
-                if (this.isNode()) {
-                    
-                } else {
-                    
-                }
-                break;
-            case call.error:
-                if (this.isNode()) {
-                    
-                } else {
-                    
-                }
-                break;
-            case call.success:
-                if (this.isNode()) {
-                    
-                } else {
-                    
-                }
-                break;
-            default:
-                if (this.isNode()) {
-                    
-                } else {
-                    
-                }
-                break;
-        }
-    }
 
     // todo rename library to just logger
 
-    public info(...msg): void  {
+    private prepare(...msg) {
+        const callee: string = msg.splice(1, 1)[0].toLocaleLowerCase()
+
+        const time: string = '[' + new Date().toISOString().replace('T', ' ').substring(0, 19) + ']';
 
         if (process) {
-            this.infoNode.apply(this, arguments)
+            this[callee + 'Node'].apply(this, [time, ...arguments])
+            console.log('---------------------');
+            console.log(arguments);
+            Array.prototype.splice(0, 1)//.apply(arguments);
+            Array.prototype.splice(1, 1)//.apply(arguments);
+
+            this.writeToFile(util.format.apply(this, [time, ...arguments]) + '\n');
         }
         else {
-            this.infoBrowser.apply(this, arguments)
+            this[callee + 'Browser'].apply(this, [time, ...arguments])
         }
+    }
 
-
-        // this.print(msg, {
-        //     color: white,
-        //     prefix: 'INFO:   '
-        // });
+    public info(...msg): void  {
+        this.prepare.apply(this, [yellow, call.info, reset, ...arguments])
     }
 
     public warn(...msg): void {
@@ -215,25 +175,11 @@ class logger {
 
 
     private print(msg: string[], level: ILogLevel): void {
-        let output: string = '';
-        // console.log(msg);
-        // console.log(JSON.parse(JSON.stringify(msg)))
-
-        // for (let index: number = 0; index < msg.length; index++) {
-        //     // console.log(msg[index]);
-        //     output += msg[index]
-        // }
-
-        // console.log(output);
-        
-        
-
         // const time: string = '[' + new Date().toISOString().replace('T', ' ').substring(0, 19) + ']';
         
         // console.log(time,level.color,level.prefix,reset,level.color,msg,reset);
         // msg = time + level.color + level.prefix + reset + level.color + msg + reset;
 
-        // console.log(msg);
         
         // if (this.writeInFile) {   
         //     this.writeToFile(`${time} ${level.prefix} ${msg += '\r\n'}`); 
@@ -270,3 +216,16 @@ class logger {
 }
 
 export default new logger();
+
+const text = `
+--[[ 
+'########:'########::'########:'##::::'##:::::'##:::::'##::'#######::'########::'##:::'##::'######::
+ ##..  ##: ##.... ##: ##.....:: ##:::: ##::::: ##:'##: ##:'##.... ##: ##.... ##: ##::'##::'##... ##:
+..:: ##::: ##:::: ##: ##::::::: ##:::: ##::::: ##: ##: ##: ##:::: ##: ##:::: ##: ##:'##::: ##:::..::
+::: ##:::: ##:::: ##: ######::: ##:::: ##:'##: ##: ##: ##: ##:::: ##: ########:: #####::::. ######::
+:: ##::::: ##:::: ##: ##...::::. ##:: ##::...: ##: ##: ##: ##:::: ##: ##.. ##::: ##. ##::::..... ##:
+:: ##::::: ##:::: ##: ##::::::::. ## ##::::::: ##: ##: ##: ##:::: ##: ##::. ##:: ##:. ##::'##::: ##:
+:: ##::::: ########:: ########:::. ###::::::::. ###. ###::. #######:: ##:::. ##: ##::. ##:. ######::
+::..::::::........:::........:::::...::::::::::...::...::::.......:::..:::::..::..::::..:::......::: 
+--]]
+`;
