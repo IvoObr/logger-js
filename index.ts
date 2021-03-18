@@ -1,131 +1,92 @@
 import fs from 'fs';
 import util from 'util';
 
-// '\x1b[36m%s\x1b[0m'
-
-
 // todo readme
+// todo rename library to just logger
 
+enum colors {
+    bright = "\x1b[1m",
+    dim = "\x1b[2m",
+    red = "\x1b[31m",
+    green = "\x1b[32m",
+    yellow = "\x1b[33m",
+    blue = "\x1b[34m",
+    white = "\x1b[37m"
+}
 
-// todo make colors enum
-const reset: string = "\x1b[0m";
-const bright: string = "\x1b[1m";
-const dim: string = "\x1b[2m";
-const underscore: string = "\x1b[4m";
-const blink: string = "\x1b[5m";
-const reverse: string = "\x1b[7m";
-const hidden: string = "\x1b[8m";
-const black: string = "\x1b[30m";
-const red: string = "\x1b[31m";
-const green: string = "\x1b[32m";
-const yellow: string = "\x1b[33m";
-const blue: string = "\x1b[34m";
-const magenta: string = "\x1b[35m";
-const cyan: string = "\x1b[36m";
-const white: string = "\x1b[37m";
-const BGblack: string = "\x1b[40m";
-const BGred: string = "\x1b[41m";
-const BGgreen: string = "\x1b[42m";
-const BGyellow: string = "\x1b[43m";
-const BGblue: string = "\x1b[44m";
-const BGmagenta: string = "\x1b[45m";
-const BGcyan: string = "\x1b[46m";
-const BGwhite: string = "\x1b[47m";
+enum styles {
+    reset = "\x1b[0m",
+    underscore = "\x1b[4m",
+    reverse = "\x1b[7m",
+    bold = "\033[0m"
+}
 
- enum call {
+enum call {
     info = 'INFO',
     warn = 'WARN',
     trace = 'TRACE',
     error = 'ERROR',
     success = 'SUCCESS'
 } 
-// const bold: string = "\033[0m";
 
- interface ILogLevel {
-    color: string,
-    prefix: string;
-}
-
-export interface ILogOptions {
-    logFileName: string,
-    writeInFile: boolean
-}
+type all = any[];
 
 class logger {
 
     private logFileName: string = 'logger-mogger.log';
-    private writeInFile: boolean = true;
 
-    constructor(options?: ILogOptions) {
+    public info(...msg: all): void  {
+        const args: all = [
+            colors.white,
+            call.info,
+            styles.reset,
+            ...arguments
+        ];
 
- //todo check if is it node or window
-
-        if (typeof options?.logFileName === 'string') {
-            this.logFileName = options?.logFileName;
-        }
-
-        if (typeof options?.writeInFile === 'boolean') {
-            this.writeInFile = options?.writeInFile;
-        }
+        this.prepareAndSend.apply(this, args);
     }
 
-    private isNode = (): boolean => (process && true)
+    public warn(...msg: all): void {
+        const args: all = [
+            colors.yellow,
+            call.warn,
+            styles.reset,
+            ...arguments
+        ];
 
-
-    // todo rename library to just logger
-
-    private prepare(...msg) {
-        const callee: string = msg.splice(1, 1)[0].toLocaleLowerCase()
-
-        const time: string = '[' + new Date().toISOString().replace('T', ' ').substring(0, 19) + ']';
-
-        if (process) {
-            this[callee + 'Node'].apply(this, [time, ...arguments])
-            console.log('---------------------');
-            console.log(arguments);
-            Array.prototype.splice(0, 1)//.apply(arguments);
-            Array.prototype.splice(1, 1)//.apply(arguments);
-
-            this.writeToFile(util.format.apply(this, [time, ...arguments]) + '\n');
-        }
-        else {
-            this[callee + 'Browser'].apply(this, [time, ...arguments])
-        }
+        this.prepareAndSend.apply(this, args);
     }
 
-    public info(...msg): void  {
-        this.prepare.apply(this, [yellow, call.info, reset, ...arguments])
+    public trace(...msg: all): void {
+        const args: all = [
+            colors.dim,
+            call.trace,
+            styles.reset,
+            ...arguments
+        ];
+
+        this.prepareAndSend.apply(this, args);
     }
 
-    public warn(...msg): void {
-        this.print(msg, {
-            color: yellow,
-            prefix: 'WARNING:'
-        });
+    public error(...msg: all): void {
+        const args: all = [
+            colors.red,
+            call.error,
+            styles.reset,
+            ...arguments
+        ];
     }
 
-    public trace(...msg): void {
-        this.print(msg, {
-            color: white,
-            prefix: 'TRACE:  '
-        });
+    public success(...msg: all): void {
+        const args: all = [
+            colors.green,
+            call.success,
+            styles.reset,
+            ...arguments
+        ];
     }
 
-    public error(...msg): void {
-        this.print(msg, {
-            color: red,
-            prefix: 'ERROR:  '
-        });
-    }
-
-    public success(...msg): void {
-        this.print(msg, {
-            color: green,
-            prefix: 'SUCCESS:'
-        });
-    }
-
-    public infoNode(...msg) {
+    public infoNode(...msg: all): void {
         process.stdout.write(util.format.apply(this, arguments) + '\n');
     }
 
@@ -133,7 +94,7 @@ class logger {
         process.stderr.write(util.format.apply(this, arguments) + '\n');
     }
 
-    private traceNode(): void {
+    private traceNode(...msg: all): void {
         var error: Error = new Error;
         error.name = 'Trace';
         error.message = util.format.apply(this, arguments);
@@ -141,7 +102,7 @@ class logger {
         this.error(error.stack);
     }
 
-    private errorNode(): void {
+    private errorNode(...msg: all): void {
         var error: Error = new Error;
         error.name = 'Error';
         error.message = util.format.apply(this, arguments);
@@ -149,42 +110,58 @@ class logger {
         this.error(error.stack);
     }
 
-    private successNode(): void {
+    private successNode(...msg: all): void {
         process.stdout.write(util.format.apply(this, arguments) + '\n');
     }
 
-    private infoBrowser(msg): void {
+    private infoBrowser(...msg: all): void {
         console.log(console.log.apply(this, arguments) + '\n');
     }
 
-    private warnBrowser(): void {
+    private warnBrowser(...msg: all): void {
         console.warn(console.warn.apply(this, arguments) + '\n');
     }
 
-    private traceBrowser(): void {
+    private traceBrowser(...msg: all): void {
         console.trace(console.trace.apply(this, arguments) + '\n');
     }
 
-    private errorBrowser(): void {
+    private errorBrowser(...msg: all): void {
         console.error(console.error.apply(this, arguments) + '\n');
     }
 
-    private successBrowser(): void {
+    private successBrowser(...msg: all): void {
         console.log(console.log.apply(this, arguments) + '\n');
     }
 
+    private prepareAndSend(...msg: all): void {
+        const caller: string = this.getCaller(msg);
+        const time: string = this.getTime();
+        const args: all = [time, ...arguments];
 
-    private print(msg: string[], level: ILogLevel): void {
-        // const time: string = '[' + new Date().toISOString().replace('T', ' ').substring(0, 19) + ']';
-        
-        // console.log(time,level.color,level.prefix,reset,level.color,msg,reset);
-        // msg = time + level.color + level.prefix + reset + level.color + msg + reset;
+        if (typeof process !== 'undefined') {
+            this[caller + 'Node'].apply(this, args)
+            this.writeToFile(util.format.apply(this, args) + '\n');
+        }
 
-        
-        // if (this.writeInFile) {   
-        //     this.writeToFile(`${time} ${level.prefix} ${msg += '\r\n'}`); 
-        //     // this.writeToFile(msg)
-        // }
+        if (typeof window !== 'undefined') {
+            this[caller + 'Browser'].apply(this, args)
+        }
+    }
+
+    private getTime(): string {
+        const time: string = new Date()
+            .toISOString()
+            .replace('T', ' ')
+            .substring(0, 19);
+
+        return `[${time}]`;
+    }
+
+    private getCaller(msg: all): string {
+        return msg
+            .splice(1, 1)[0]
+            .toLowerCase();
     }
 
     private writeToFile(msg: string): void {
@@ -216,16 +193,3 @@ class logger {
 }
 
 export default new logger();
-
-const text = `
---[[ 
-'########:'########::'########:'##::::'##:::::'##:::::'##::'#######::'########::'##:::'##::'######::
- ##..  ##: ##.... ##: ##.....:: ##:::: ##::::: ##:'##: ##:'##.... ##: ##.... ##: ##::'##::'##... ##:
-..:: ##::: ##:::: ##: ##::::::: ##:::: ##::::: ##: ##: ##: ##:::: ##: ##:::: ##: ##:'##::: ##:::..::
-::: ##:::: ##:::: ##: ######::: ##:::: ##:'##: ##: ##: ##: ##:::: ##: ########:: #####::::. ######::
-:: ##::::: ##:::: ##: ##...::::. ##:: ##::...: ##: ##: ##: ##:::: ##: ##.. ##::: ##. ##::::..... ##:
-:: ##::::: ##:::: ##: ##::::::::. ## ##::::::: ##: ##: ##: ##:::: ##: ##::. ##:: ##:. ##::'##::: ##:
-:: ##::::: ########:: ########:::. ###::::::::. ###. ###::. #######:: ##:::. ##: ##::. ##:. ######::
-::..::::::........:::........:::::...::::::::::...::...::::.......:::..:::::..::..::::..:::......::: 
---]]
-`;
