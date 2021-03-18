@@ -2,6 +2,8 @@ import fs from 'fs';
 import util from 'util';
 
 // todo readme
+// todo test all
+// todo bump version
 
 enum colors {
     bright = "\x1b[1m",
@@ -72,6 +74,8 @@ class logger {
             styles.reset,
             ...arguments
         ];
+
+        this.prepareAndSend.apply(this, args);
     }
 
     public success(...msg: any[]): void {
@@ -81,6 +85,8 @@ class logger {
             styles.reset,
             ...arguments
         ];
+
+        this.prepareAndSend.apply(this, args);
     }
 
     private infoNode(...msg: any[]): void {
