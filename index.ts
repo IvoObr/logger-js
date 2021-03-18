@@ -2,7 +2,6 @@ import fs from 'fs';
 import util from 'util';
 
 // todo readme
-// todo rename library to just logger
 
 enum colors {
     bright = "\x1b[1m",
@@ -29,14 +28,12 @@ enum call {
     success = 'SUCCESS'
 } 
 
-type all = any[];
-
 class logger {
 
     private logFileName: string = 'logger-mogger.log';
 
-    public info(...msg: all): void  {
-        const args: all = [
+    public info(...msg: any[]): void  {
+        const args: any[] = [
             colors.white,
             call.info,
             styles.reset,
@@ -46,8 +43,8 @@ class logger {
         this.prepareAndSend.apply(this, args);
     }
 
-    public warn(...msg: all): void {
-        const args: all = [
+    public warn(...msg: any[]): void {
+        const args: any[] = [
             colors.yellow,
             call.warn,
             styles.reset,
@@ -57,8 +54,8 @@ class logger {
         this.prepareAndSend.apply(this, args);
     }
 
-    public trace(...msg: all): void {
-        const args: all = [
+    public trace(...msg: any[]): void {
+        const args: any[] = [
             colors.dim,
             call.trace,
             styles.reset,
@@ -68,8 +65,8 @@ class logger {
         this.prepareAndSend.apply(this, args);
     }
 
-    public error(...msg: all): void {
-        const args: all = [
+    public error(...msg: any[]): void {
+        const args: any[] = [
             colors.red,
             call.error,
             styles.reset,
@@ -77,8 +74,8 @@ class logger {
         ];
     }
 
-    public success(...msg: all): void {
-        const args: all = [
+    public success(...msg: any[]): void {
+        const args: any[] = [
             colors.green,
             call.success,
             styles.reset,
@@ -86,58 +83,58 @@ class logger {
         ];
     }
 
-    public infoNode(...msg: all): void {
+    private infoNode(...msg: any[]): void {
         process.stdout.write(util.format.apply(this, arguments) + '\n');
     }
 
-    private warnNode(): void {
+    private warnNode(...msg: any[]): void {
         process.stderr.write(util.format.apply(this, arguments) + '\n');
     }
 
-    private traceNode(...msg: all): void {
+    private traceNode(...msg: any[]): void {
         var error: Error = new Error;
         error.name = 'Trace';
         error.message = util.format.apply(this, arguments);
         Error.captureStackTrace(error, this.traceNode);
-        this.error(error.stack);
+        this.warnNode(error.stack);
     }
 
-    private errorNode(...msg: all): void {
+    private errorNode(...msg: any[]): void {
         var error: Error = new Error;
         error.name = 'Error';
         error.message = util.format.apply(this, arguments);
         Error.captureStackTrace(error, this.errorNode);
-        this.error(error.stack);
+        this.warnNode(error.stack);
     }
 
-    private successNode(...msg: all): void {
+    private successNode(...msg: any[]): void {
         process.stdout.write(util.format.apply(this, arguments) + '\n');
     }
 
-    private infoBrowser(...msg: all): void {
+    private infoBrowser(...msg: any[]): void {
         console.log(console.log.apply(this, arguments) + '\n');
     }
 
-    private warnBrowser(...msg: all): void {
+    private warnBrowser(...msg: any[]): void {
         console.warn(console.warn.apply(this, arguments) + '\n');
     }
 
-    private traceBrowser(...msg: all): void {
+    private traceBrowser(...msg: any[]): void {
         console.trace(console.trace.apply(this, arguments) + '\n');
     }
 
-    private errorBrowser(...msg: all): void {
+    private errorBrowser(...msg: any[]): void {
         console.error(console.error.apply(this, arguments) + '\n');
     }
 
-    private successBrowser(...msg: all): void {
+    private successBrowser(...msg: any[]): void {
         console.log(console.log.apply(this, arguments) + '\n');
     }
 
-    private prepareAndSend(...msg: all): void {
+    private prepareAndSend(...msg: any[]): void {
         const caller: string = this.getCaller(msg);
         const time: string = this.getTime();
-        const args: all = [time, ...arguments];
+        const args: any[] = [time, ...arguments];
 
         if (typeof process !== 'undefined') {
             this[caller + 'Node'].apply(this, args)
@@ -158,7 +155,7 @@ class logger {
         return `[${time}]`;
     }
 
-    private getCaller(msg: all): string {
+    private getCaller(msg: any[]): string {
         return msg
             .splice(1, 1)[0]
             .toLowerCase();
