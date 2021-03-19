@@ -4,7 +4,11 @@ import util from 'util';
 // todo readme
 // todo test all
 // todo bump version
+// todo bold !!! 
+// todo namespace
+// todo rainbow
 
+// #region Enumns
 enum colors {
     bright = "\x1b[1m",
     dim = "\x1b[2m",
@@ -29,10 +33,26 @@ enum call {
     error = 'ERROR',
     success = 'SUCCESS'
 } 
+// #endregion
 
-class logger {
+// #region Classes
+abstract class Log {
+    public abstract info(...msg: any[]): void
+    public abstract warn(...msg: any[]): void
+    public abstract trace(...msg: any[]): void
+    public abstract error(...msg: any[]): void
+    public abstract success(...msg: any[]): void
+}
 
-    private logFileName: string = 'logger-mogger.log';
+class logger extends Log {
+
+    private readonly logFileName: string = 'logger-mogger.log';
+
+    constructor(
+        private Browser: BrowserLog,
+        private Node: NodeLog) {
+        super();
+    }
 
     public info(...msg: any[]): void  {
         const args: any[] = [
@@ -89,66 +109,18 @@ class logger {
         this.prepareAndSend.apply(this, args);
     }
 
-    private infoNode(...msg: any[]): void {
-        process.stdout.write(util.format.apply(this, arguments) + '\n');
-    }
-
-    private warnNode(...msg: any[]): void {
-        process.stderr.write(util.format.apply(this, arguments) + '\n');
-    }
-
-    private traceNode(...msg: any[]): void {
-        var error: Error = new Error;
-        error.name = 'Trace';
-        error.message = util.format.apply(this, arguments);
-        Error.captureStackTrace(error, this.traceNode);
-        this.warnNode(error.stack);
-    }
-
-    private errorNode(...msg: any[]): void {
-        var error: Error = new Error;
-        error.name = 'Error';
-        error.message = util.format.apply(this, arguments);
-        Error.captureStackTrace(error, this.errorNode);
-        this.warnNode(error.stack);
-    }
-
-    private successNode(...msg: any[]): void {
-        process.stdout.write(util.format.apply(this, arguments) + '\n');
-    }
-
-    private infoBrowser(...msg: any[]): void {
-        console.log(console.log.apply(this, arguments) + '\n');
-    }
-
-    private warnBrowser(...msg: any[]): void {
-        console.warn(console.warn.apply(this, arguments) + '\n');
-    }
-
-    private traceBrowser(...msg: any[]): void {
-        console.trace(console.trace.apply(this, arguments) + '\n');
-    }
-
-    private errorBrowser(...msg: any[]): void {
-        console.error(console.error.apply(this, arguments) + '\n');
-    }
-
-    private successBrowser(...msg: any[]): void {
-        console.log(console.log.apply(this, arguments) + '\n');
-    }
-
     private prepareAndSend(...msg: any[]): void {
         const caller: string = this.getCaller(msg);
         const time: string = this.getTime();
         const args: any[] = [time, ...arguments];
 
         if (typeof process !== 'undefined') {
-            this[caller + 'Node'].apply(this, args)
+            this.Node[caller].apply(this, args)
             this.writeToFile(util.format.apply(this, args) + '\n');
         }
 
         if (typeof window !== 'undefined') {
-            this[caller + 'Browser'].apply(this, args)
+            this.Browser[caller].apply(this, args)
         }
     }
 
@@ -195,4 +167,66 @@ class logger {
 
 }
 
-export default new logger();
+class BrowserLog extends Log {
+
+    public info(...msg: any[]): void {
+        console.log(console.log.apply(this, arguments as IArguments) + '\n');
+    }
+
+    public warn(...msg: any[]): void {
+        console.warn(console.warn.apply(this, arguments as IArguments) + '\n');
+    }
+
+    public trace(...msg: any[]): void {
+        console.trace(console.trace.apply(this, arguments as IArguments) + '\n');
+    }
+
+    public error(...msg: any[]): void {
+        console.error(console.error.apply(this, arguments as IArguments) + '\n');
+    }
+
+    public success(...msg: any[]): void {
+        console.log(console.log.apply(this, arguments as IArguments) + '\n');
+    }
+}
+
+class NodeLog extends Log {
+
+    public info(...msg: any[]): void {
+        process.stdout.write(util.format.apply(this, arguments) + '\n');
+    }
+
+    public warn(...msg: any[]): void {
+        process.stderr.write(util.format.apply(this, arguments) + '\n');
+    }
+
+    public trace(...msg: any[]): void {
+        var error: Error = new Error;
+        error.name = 'Trace';
+        error.message = util.format.apply(this, arguments);
+        Error.captureStackTrace(error, this.trace);
+
+        console.log(this);
+        
+        this.Node.warn(error.stack);
+    }
+
+    public error(...msg: any[]): void {
+        var error: Error = new Error;
+        error.name = 'Error';
+        error.message = util.format.apply(this, arguments);
+        Error.captureStackTrace(error, this.error);
+
+        console.log(this);
+
+        this.warn(error.stack);
+    }
+
+    public success(...msg: any[]): void {
+        process.stdout.write(util.format.apply(this, arguments) + '\n');
+    }
+}
+// #endregion
+
+/* Exports */
+export default new logger(new BrowserLog(), new NodeLog());
