@@ -8,8 +8,8 @@ import util from 'util';
 // todo bold !!! 
 // todo namespace
 // todo rainbow
+// todo remove duplicate code
 
-// #region Enumns
 enum colors {
     bright = "\x1b[1m",
     dim = "\x1b[2m",
@@ -34,9 +34,6 @@ enum call {
     error = 'ERROR',
     success = 'SUCCESS'
 } 
-// #endregion
-
-// #region Classes
 
 class logger {
 
@@ -46,8 +43,8 @@ class logger {
         const args: any[] = [
             colors.white,
             call.info,
-            styles.reset,
-            ...arguments
+            ...arguments,
+            styles.reset
         ];
 
         this.prepareAndSend.apply(this, args);
@@ -57,8 +54,8 @@ class logger {
         const args: any[] = [
             colors.yellow,
             call.warn,
-            styles.reset,
-            ...arguments
+            ...arguments,
+            styles.reset
         ];
 
         this.prepareAndSend.apply(this, args);
@@ -68,8 +65,8 @@ class logger {
         const args: any[] = [
             colors.dim,
             call.trace,
-            styles.reset,
-            ...arguments
+            ...arguments,
+            styles.reset
         ];
 
         this.prepareAndSend.apply(this, args);
@@ -79,8 +76,8 @@ class logger {
         const args: any[] = [
             colors.red,
             call.error,
-            styles.reset,
-            ...arguments
+            ...arguments,
+            styles.reset
         ];
 
         this.prepareAndSend.apply(this, args);
@@ -90,8 +87,8 @@ class logger {
         const args: any[] = [
             colors.green,
             call.success,
-            styles.reset,
-            ...arguments
+            ...arguments,
+            styles.reset
         ];
 
         this.prepareAndSend.apply(this, args);
@@ -100,7 +97,8 @@ class logger {
     private prepareAndSend(...msg: any[]): void {
         const caller: string = this.getCaller(msg);
         const time: string = this.getTime();
-        const args: any[] = [time, ...arguments];
+        const args: any[] = [...arguments];
+        args.splice(1, 0, time)
 
         if (typeof process !== 'undefined') {
             NodeLog[caller].apply(this, args)
@@ -184,31 +182,39 @@ class NodeLog {
         process.stdout.write(util.format.apply(this, arguments) + '\n');
     }
 
-    static warn(...msg: any[]): void {
+    static warn(...msg: any[]): void {       
         process.stderr.write(util.format.apply(this, arguments) + '\n');
     }
 
     static trace(...msg: any[]): void {
-        var error: Error = new Error;
-        error.name = 'Trace';
-        error.message = util.format.apply(this, arguments);
-        Error.captureStackTrace(error, this.trace);        
-        NodeLog.warn(error.stack);
+        const error: Error = new Error;
+        const args: any[] = [...arguments]
+        const time: string = args.splice(0, 1)[0];
+
+        error.name = time;
+        error.message = util.format.apply(this, args);
+
+        Error.captureStackTrace(error, this.trace); 
+        // console.log(error.stack.split(' '));
+    
+        NodeLog.warn(error.stack.replace(':', ''));
     }
 
     static error(...msg: any[]): void {
-        var error: Error = new Error;
-        error.name = 'Error';
-        error.message = util.format.apply(this, arguments);
+        const error: Error = new Error;
+        const args: any[] = [...arguments]
+        const time: string = args.splice(0, 1)[0];
+
+        error.name = time;
+        error.message = util.format.apply(this, args);
+
         Error.captureStackTrace(error, this.error);
-        NodeLog.warn(error.stack);
+        NodeLog.warn(error.stack.replace(':', ''));
     }
 
     static success(...msg: any[]): void {
         process.stdout.write(util.format.apply(this, arguments) + '\n');
     }
 }
-// #endregion
 
-/* Exports */
 export default new logger();
