@@ -3,9 +3,6 @@ import util from 'util';
 
 // todo readme
 // todo test all
-// todo bump version
-// todo bold !!! 
-// todo namespace
 // todo rainbow
 // todo remove duplicate code
 
