@@ -1,3 +1,4 @@
+import { timeStamp } from 'console';
 import fs from 'fs';
 import util from 'util';
 
@@ -36,23 +37,10 @@ enum call {
 // #endregion
 
 // #region Classes
-abstract class Log {
-    public abstract info(...msg: any[]): void
-    public abstract warn(...msg: any[]): void
-    public abstract trace(...msg: any[]): void
-    public abstract error(...msg: any[]): void
-    public abstract success(...msg: any[]): void
-}
 
-class logger extends Log {
+class logger {
 
     private readonly logFileName: string = 'logger-mogger.log';
-
-    constructor(
-        private Browser: BrowserLog,
-        private Node: NodeLog) {
-        super();
-    }
 
     public info(...msg: any[]): void  {
         const args: any[] = [
@@ -115,12 +103,12 @@ class logger extends Log {
         const args: any[] = [time, ...arguments];
 
         if (typeof process !== 'undefined') {
-            this.Node[caller].apply(this, args)
+            NodeLog[caller].apply(this, args)
             this.writeToFile(util.format.apply(this, args) + '\n');
         }
 
         if (typeof window !== 'undefined') {
-            this.Browser[caller].apply(this, args)
+            BrowserLog[caller].apply(this, args)
         }
     }
 
@@ -167,66 +155,60 @@ class logger extends Log {
 
 }
 
-class BrowserLog extends Log {
+class BrowserLog {
 
-    public info(...msg: any[]): void {
-        console.log(console.log.apply(this, arguments as IArguments) + '\n');
+    static info(...msg: any[]): void {
+        console.log(console.log.apply(this, arguments) + '\n');
     }
 
-    public warn(...msg: any[]): void {
-        console.warn(console.warn.apply(this, arguments as IArguments) + '\n');
+    static warn(...msg: any[]): void {
+        console.warn(console.warn.apply(this, arguments) + '\n');
     }
 
-    public trace(...msg: any[]): void {
-        console.trace(console.trace.apply(this, arguments as IArguments) + '\n');
+    static trace(...msg: any[]): void {
+        console.trace(console.trace.apply(this, arguments) + '\n');
     }
 
-    public error(...msg: any[]): void {
-        console.error(console.error.apply(this, arguments as IArguments) + '\n');
+    static error(...msg: any[]): void {
+        console.error(console.error.apply(this, arguments) + '\n');
     }
 
-    public success(...msg: any[]): void {
-        console.log(console.log.apply(this, arguments as IArguments) + '\n');
+    static success(...msg: any[]): void {
+        console.log(console.log.apply(this, arguments) + '\n');
     }
 }
 
-class NodeLog extends Log {
+class NodeLog {
 
-    public info(...msg: any[]): void {
+    static info(...msg: any[]): void {
         process.stdout.write(util.format.apply(this, arguments) + '\n');
     }
 
-    public warn(...msg: any[]): void {
+    static warn(...msg: any[]): void {
         process.stderr.write(util.format.apply(this, arguments) + '\n');
     }
 
-    public trace(...msg: any[]): void {
+    static trace(...msg: any[]): void {
         var error: Error = new Error;
         error.name = 'Trace';
         error.message = util.format.apply(this, arguments);
-        Error.captureStackTrace(error, this.trace);
-
-        console.log(this);
-        
-        this.Node.warn(error.stack);
+        Error.captureStackTrace(error, this.trace);        
+        NodeLog.warn(error.stack);
     }
 
-    public error(...msg: any[]): void {
+    static error(...msg: any[]): void {
         var error: Error = new Error;
         error.name = 'Error';
         error.message = util.format.apply(this, arguments);
         Error.captureStackTrace(error, this.error);
-
-        console.log(this);
-
-        this.warn(error.stack);
+        NodeLog.warn(error.stack);
     }
 
-    public success(...msg: any[]): void {
+    static success(...msg: any[]): void {
         process.stdout.write(util.format.apply(this, arguments) + '\n');
     }
 }
 // #endregion
 
 /* Exports */
-export default new logger(new BrowserLog(), new NodeLog());
+export default new logger();
