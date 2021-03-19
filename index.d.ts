@@ -7,7 +7,6 @@ declare class logger {
     success(...msg: any[]): void;
     private prepareAndSend;
     private getTime;
-    private getCaller;
     private writeToFile;
     private doFileExist;
 }

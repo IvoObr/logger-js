@@ -21,92 +21,77 @@ enum colors {
 }
 
 enum styles {
-    reset = "\x1b[0m",
-    underscore = "\x1b[4m",
-    reverse = "\x1b[7m",
-    bold = "\033[0m"
+    reset = '\x1b[0m',
+    underscore = '\x1b[4m',
+    reverse = '\x1b[7m',
+    bold = '\u001b[1m'
 }
 
 enum call {
-    info = 'INFO',
-    warn = 'WARN',
-    trace = 'TRACE',
-    error = 'ERROR',
-    success = 'SUCCESS'
-} 
+    info = <any>'INFO',
+    warn = <any>'WARN',
+    trace = <any>'TRACE',
+    error = <any>'ERROR',
+    success = <any>'SUCCESS'
+}
+
+enum mapColors {
+    info = <any>colors.white,
+    warn = <any>colors.yellow,
+    trace = <any>colors.blue,
+    error = <any>colors.red,
+    success = <any>colors.green
+}
 
 class logger {
 
     private readonly logFileName: string = 'logger-mogger.log';
 
     public info(...msg: any[]): void  {
-        const args: any[] = [
-            colors.white,
-            call.info,
-            ...arguments,
-            styles.reset
-        ];
-
+        const args: any[] = [call.info, ...arguments];
+        
         this.prepareAndSend.apply(this, args);
     }
 
     public warn(...msg: any[]): void {
-        const args: any[] = [
-            colors.yellow,
-            call.warn,
-            ...arguments,
-            styles.reset
-        ];
-
+        const args: any[] = [call.warn, ...arguments];
+        
         this.prepareAndSend.apply(this, args);
     }
 
     public trace(...msg: any[]): void {
-        const args: any[] = [
-            colors.dim,
-            call.trace,
-            ...arguments,
-            styles.reset
-        ];
-
+        const args: any[] = [call.trace, ...arguments];
+        
         this.prepareAndSend.apply(this, args);
     }
 
     public error(...msg: any[]): void {
-        const args: any[] = [
-            colors.red,
-            call.error,
-            ...arguments,
-            styles.reset
-        ];
+        const args: any[] = [ call.error,  ...arguments ];
 
         this.prepareAndSend.apply(this, args);
     }
 
     public success(...msg: any[]): void {
-        const args: any[] = [
-            colors.green,
-            call.success,
-            ...arguments,
-            styles.reset
-        ];
+        const args: any[] = [ call.success, ...arguments ];
 
         this.prepareAndSend.apply(this, args);
     }
 
-    private prepareAndSend(...msg: any[]): void {
-        const caller: string = this.getCaller(msg);
-        const time: string = this.getTime();
+    private prepareAndSend(): void {       
         const args: any[] = [...arguments];
-        args.splice(1, 0, time)
+        const caller: string = args.shift();
+        const time: string = this.getTime();
+        const color: colors = mapColors[caller.toLowerCase()];
+        const message: string = `${styles.reset}${styles.bold}${color}${time} ${caller}:${styles.reset}${color}`;
+        args.unshift(message);
 
         if (typeof process !== 'undefined') {
-            NodeLog[caller].apply(this, args)
+            NodeLog[call[caller]].apply(this, args)
             this.writeToFile(util.format.apply(this, args) + '\n');
         }
 
         if (typeof window !== 'undefined') {
-            BrowserLog[caller].apply(this, args)
+            BrowserLog[call[caller]].apply(this, args)
         }
     }
 
@@ -117,12 +102,6 @@ class logger {
             .substring(0, 19);
 
         return `[${time}]`;
-    }
-
-    private getCaller(msg: any[]): string {
-        return msg
-            .splice(1, 1)[0]
-            .toLowerCase();
     }
 
     private writeToFile(msg: string): void {
@@ -155,38 +134,38 @@ class logger {
 
 class BrowserLog {
 
-    static info(...msg: any[]): void {
+    public static info(...msg: any[]): void {
         console.log(console.log.apply(this, arguments) + '\n');
     }
 
-    static warn(...msg: any[]): void {
+    public static warn(...msg: any[]): void {
         console.warn(console.warn.apply(this, arguments) + '\n');
     }
 
-    static trace(...msg: any[]): void {
+    public static trace(...msg: any[]): void {
         console.trace(console.trace.apply(this, arguments) + '\n');
     }
 
-    static error(...msg: any[]): void {
+    public static error(...msg: any[]): void {
         console.error(console.error.apply(this, arguments) + '\n');
     }
 
-    static success(...msg: any[]): void {
+    public static success(...msg: any[]): void {
         console.log(console.log.apply(this, arguments) + '\n');
     }
 }
 
 class NodeLog {
 
-    static info(...msg: any[]): void {
+    public static info(...msg: any[]): void {
         process.stdout.write(util.format.apply(this, arguments) + '\n');
     }
 
-    static warn(...msg: any[]): void {       
+    public static warn(...msg: any[]): void {       
         process.stderr.write(util.format.apply(this, arguments) + '\n');
     }
 
-    static trace(...msg: any[]): void {
+    public static trace(...msg: any[]): void {
         const error: Error = new Error;
         const args: any[] = [...arguments]
         const time: string = args.splice(0, 1)[0];
@@ -194,13 +173,11 @@ class NodeLog {
         error.name = time;
         error.message = util.format.apply(this, args);
 
-        Error.captureStackTrace(error, this.trace); 
-        // console.log(error.stack.split(' '));
-    
-        NodeLog.warn(error.stack.replace(':', ''));
+        Error.captureStackTrace(error, this.trace);     
+        NodeLog.warn(error.stack);
     }
 
-    static error(...msg: any[]): void {
+    public static error(...msg: any[]): void {
         const error: Error = new Error;
         const args: any[] = [...arguments]
         const time: string = args.splice(0, 1)[0];
@@ -209,10 +186,10 @@ class NodeLog {
         error.message = util.format.apply(this, args);
 
         Error.captureStackTrace(error, this.error);
-        NodeLog.warn(error.stack.replace(':', ''));
+        NodeLog.warn(error.stack);
     }
 
-    static success(...msg: any[]): void {
+    public static success(...msg: any[]): void {
         process.stdout.write(util.format.apply(this, arguments) + '\n');
     }
 }
