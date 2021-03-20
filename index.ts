@@ -4,7 +4,6 @@ import util from 'util';
 // todo readme
 // todo test all
 // todo rainbow
-// todo remove duplicate code
 
 enum colors {
     bright = "\x1b[1m",
@@ -42,34 +41,30 @@ enum mapColors {
 class logger {
 
     private readonly logFileName: string = 'logger-mogger.log';
+    private readonly magic_number: number = 19;
 
     public info(...msg: any[]): void {
         const args: any[] = [call.info, ...arguments];
-
         this.prepareAndSend.apply(this, args);
     }
 
     public warn(...msg: any[]): void {
         const args: any[] = [call.warn, ...arguments];
-
         this.prepareAndSend.apply(this, args);
     }
 
     public trace(...msg: any[]): void {
         const args: any[] = [call.trace, ...arguments];
-
         this.prepareAndSend.apply(this, args);
     }
 
     public error(...msg: any[]): void {
         const args: any[] = [call.error, ...arguments];
-
         this.prepareAndSend.apply(this, args);
     }
 
     public success(...msg: any[]): void {
         const args: any[] = [call.success, ...arguments];
-
         this.prepareAndSend.apply(this, args);
     }
 
@@ -93,11 +88,10 @@ class logger {
     }
 
     private getTime(): string {
-        const magic_number = 19;
         const time: string = new Date()
             .toISOString()
             .replace('T', ' ')
-            .substring(0, magic_number);
+            .substring(0, this.magic_number);
 
         return `[${time}]`;
     }
@@ -164,31 +158,27 @@ class NodeLog {
     }
 
     public static trace(): void {
-        const error: Error = new Error;
-        const args: any[] = [...arguments];
-        const time: string = args.shift();
-
-        error.name = time;
-        error.message = util.format.apply(this, args);
-
-        Error.captureStackTrace(error, this.trace);
-        NodeLog.warn.call(this, error.stack);
+        NodeLog.setStack.apply(this, arguments);
     }
 
     public static error(): void {
-        const error: Error = new Error;
-        const args: any[] = [...arguments];
-        const time: string = args.shift();
-
-        error.name = time;
-        error.message = util.format.apply(this, args);
-
-        Error.captureStackTrace(error, this.error);
-        NodeLog.warn.call(this, error.stack);
+        NodeLog.setStack.apply(this, arguments);
     }
-
     public static success(): void {
         process.stdout.write(util.format.apply(this, arguments) + '\n');
+    }
+
+    private static setStack(): void {
+        const error: Error = new Error;
+        const args: any[] = [...arguments];
+        const header: string = args.shift();
+        const caller: string = (header.indexOf('ERROR') > -1) ? 'error' : 'trace';
+
+        error.name = header;
+        error.message = util.format.apply(this, args);
+
+        Error.captureStackTrace(error, this[caller]);
+        NodeLog.warn.call(this, error.stack);
     }
 }
 
