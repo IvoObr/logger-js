@@ -4,6 +4,7 @@ import util from 'util';
 // todo readme
 // todo test all
 // todo rainbow
+// todo custom file name
 
 enum colors {
     bright = "\x1b[1m",
@@ -40,7 +41,6 @@ enum mapColors {
 
 class logger {
 
-    private readonly logFileName: string = 'logger-mogger.log';
     private readonly magic_number: number = 19;
 
     public info(...msg: any[]): void {
@@ -79,7 +79,6 @@ class logger {
 
         if (typeof process !== 'undefined') {
             NodeLog[call[caller]].apply(this, args);
-            this.writeToFile(util.format.apply(this, args) + '\n');
         }
 
         if (typeof window !== 'undefined') {
@@ -95,33 +94,6 @@ class logger {
 
         return `[${time}]`;
     }
-
-    private writeToFile(msg: string): void {
-        try {
-            const fileExists: boolean = this.doFileExist();
-
-            if (fileExists) {
-                fs.appendFileSync(this.logFileName, msg);
-
-            } else {
-                fs.writeFileSync(this.logFileName, msg);
-            }
-
-        } catch (error) {
-            console.error(error);
-        }
-    }
-
-    private doFileExist(): boolean {
-        try {
-            fs.accessSync(this.logFileName);
-            return true;
-
-        } catch (error) {
-            return false;
-        }
-    }
-
 }
 
 class BrowserLog {
@@ -149,12 +121,17 @@ class BrowserLog {
 
 class NodeLog {
 
+    private static readonly logFileName: string = 'logger-mogger.log';
+
     public static info(): void {
         process.stdout.write(util.format.apply(this, arguments) + '\n');
+        NodeLog.writeToFile(util.format.apply(this, arguments) + '\n');
     }
 
     public static warn(): void {
         process.stderr.write(util.format.apply(this, arguments) + '\n');
+        NodeLog.writeToFile(util.format.apply(this, arguments) + '\n');
+
     }
 
     public static trace(): void {
@@ -166,6 +143,7 @@ class NodeLog {
     }
     public static success(): void {
         process.stdout.write(util.format.apply(this, arguments) + '\n');
+        NodeLog.writeToFile(util.format.apply(this, arguments) + '\n');
     }
 
     private static setStack(): void {
@@ -179,6 +157,32 @@ class NodeLog {
 
         Error.captureStackTrace(error, this[caller]);
         NodeLog.warn.call(this, error.stack);
+    }
+
+    private static writeToFile(msg: string): void {
+        try {
+            const fileExists: boolean = NodeLog.doFileExist();
+
+            if (fileExists) {
+                fs.appendFileSync(NodeLog.logFileName, msg);
+
+            } else {
+                fs.writeFileSync(NodeLog.logFileName, msg);
+            }
+
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    private static doFileExist(): boolean {
+        try {
+            fs.accessSync(NodeLog.logFileName);
+            return true;
+
+        } catch (error) {
+            return false;
+        }
     }
 }
 
