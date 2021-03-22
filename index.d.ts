@@ -1,13 +1,4 @@
-declare abstract class Log {
-    abstract info(): void;
-    abstract warn(): void;
-    abstract trace(): void;
-    abstract error(): void;
-    abstract success(): void;
-}
-export default class Logger extends Log {
-    private nodeLog;
-    private browserLog;
+export default class Logger {
     private readonly magic_number;
     constructor(doFileLog?: boolean, fileName?: string);
     info(...msg: any[]): void;
@@ -18,4 +9,3 @@ export default class Logger extends Log {
     private prepareAndSend;
     private getTime;
 }
-export {};

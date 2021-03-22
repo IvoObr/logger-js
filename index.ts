@@ -4,6 +4,7 @@ import util from 'util';
 // todo readme
 // todo test all
 // todo rainbow
+// todo local date
 
 enum colors {
     bright = "\x1b[1m",
@@ -38,24 +39,17 @@ enum mapColors {
     SUCCESS = <any>colors.green
 }
 
-abstract class Log {
-    public abstract info(): void;
-    public abstract warn(): void;
-    public abstract trace(): void;
-    public abstract error(): void;
-    public abstract success(): void;
-}
+export default class Logger {
 
-export default class Logger extends Log {
-
-    private nodeLog: NodeLog;
-    private browserLog: BrowserLog;
     private readonly magic_number: number = 19;
 
     constructor(doFileLog?: boolean, fileName?: string) {
-        super();
-        this.nodeLog = new NodeLog(doFileLog, fileName);
-        this.browserLog = new BrowserLog();
+        if (typeof doFileLog === 'boolean') {
+            NodeLog.doFileLog = doFileLog;
+        }  
+        if (typeof fileName === 'string') {
+            NodeLog.fileName = fileName;
+        } 
     }
 
     public info(...msg: any[]): void {
@@ -93,11 +87,11 @@ export default class Logger extends Log {
         args.unshift(header);
 
         if (typeof process !== 'undefined') {
-            this.nodeLog[call[caller]].apply(this, args);
+            NodeLog[call[caller]].apply(this, args);
         }
 
         if (typeof window !== 'undefined') {
-            this.browserLog[call[caller]].apply(this, args);
+            BrowserLog[call[caller]].apply(this, args);
         }
     }
 
@@ -111,65 +105,58 @@ export default class Logger extends Log {
     }
 }
 
-class BrowserLog extends Log {
+class BrowserLog {
 
-    public info(): void {
+    public static info(): void {
         console.log(console.log.apply(this, arguments) + '\n');
     }
 
-    public warn(): void {
+    public static warn(): void {
         console.warn(console.warn.apply(this, arguments) + '\n');
     }
 
-    public trace(): void {
+    public static trace(): void {
         console.trace(console.trace.apply(this, arguments) + '\n');
     }
 
-    public error(): void {
+    public static error(): void {
         console.error(console.error.apply(this, arguments) + '\n');
     }
 
-    public success(): void {
+    public static success(): void {
         console.log(console.log.apply(this, arguments) + '\n');
     }
 }
 
-class NodeLog extends Log {
+class NodeLog {
 
-     nodeLog: NodeLog;
+    public static doFileLog: boolean = true;
+    public static fileName: string = 'logger.log';
 
-    constructor(
-        private doFileLog: boolean = true,
-        private fileName: string = 'logger.log')
-    {
-        super();
-        this.nodeLog = this;
-    }
-
-    public info(): void {
+    public static info(msg): void {
         process.stdout.write(util.format.apply(this, arguments) + '\n');
-        this.nodeLog.writeToFile(util.format.apply(this, arguments) + '\n');    
+        NodeLog.writeToFile(util.format.apply(this, arguments) + '\n');    
     }
 
-    public warn(): void {
+    public static warn(): void {
         process.stderr.write(util.format.apply(this, arguments) + '\n');
-        this.nodeLog.writeToFile(util.format.apply(this, arguments) + '\n');    
+        NodeLog.writeToFile(util.format.apply(this, arguments) + '\n');    
     }
 
-    public trace(): void {
-        this.nodeLog.setStack.apply(this, arguments);
+    public static trace(): void {
+        NodeLog.setStack.apply(this, arguments);
     }
 
-    public error(): void {
-        this.nodeLog.setStack.apply(this, arguments);
+    public static error(): void {
+        NodeLog.setStack.apply(this, arguments);
 
     }
-    public success(): void {
+    public static success(): void {
         process.stdout.write(util.format.apply(this, arguments) + '\n');
-        this.nodeLog.writeToFile(util.format.apply(this, arguments) + '\n');    
+        NodeLog.writeToFile(util.format.apply(this, arguments) + '\n');    
     }
 
-    private setStack(): void {
+    private static setStack(): void {
         const error: Error = new Error;
         const args: any[] = [...arguments];
         const header: string = args.shift();
@@ -179,22 +166,22 @@ class NodeLog extends Log {
         error.message = util.format.apply(this, args);
 
         Error.captureStackTrace(error, this[caller]);
-        this.nodeLog.warn.call(this, error.stack);
+        NodeLog.warn.call(this, error.stack);
     }
 
-    private writeToFile(msg: string): void {
+    private static writeToFile(msg: string): void {
         try {
-            if (!this.nodeLog.doFileLog) {
+            if (!NodeLog.doFileLog) {
                 return;
             }
 
             const fileExists: boolean = this.doFileExist();
 
             if (fileExists) {
-                fs.appendFileSync(this.nodeLog.fileName, msg);
+                fs.appendFileSync(NodeLog.fileName, msg);
 
             } else {
-                fs.writeFileSync(this.nodeLog.fileName, msg);
+                fs.writeFileSync(NodeLog.fileName, msg);
             }
 
         } catch (error) {
@@ -202,9 +189,9 @@ class NodeLog extends Log {
         }
     }
 
-    private doFileExist(): boolean {
+    private static doFileExist(): boolean {
         try {
-            fs.accessSync(this.nodeLog.fileName);
+            fs.accessSync(NodeLog.fileName);
             return true;
 
         } catch (error) {
