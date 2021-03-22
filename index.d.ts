@@ -1,5 +1,15 @@
-declare class logger {
+declare abstract class Log {
+    abstract info(): void;
+    abstract warn(): void;
+    abstract trace(): void;
+    abstract error(): void;
+    abstract success(): void;
+}
+export default class Logger extends Log {
+    private nodeLog;
+    private browserLog;
     private readonly magic_number;
+    constructor(doFileLog?: boolean, fileName?: string);
     info(...msg: any[]): void;
     warn(...msg: any[]): void;
     trace(...msg: any[]): void;
@@ -8,5 +18,4 @@ declare class logger {
     private prepareAndSend;
     private getTime;
 }
-declare const _default: logger;
-export default _default;
+export {};

@@ -4,7 +4,6 @@ import util from 'util';
 // todo readme
 // todo test all
 // todo rainbow
-// todo custom file name
 
 enum colors {
     bright = "\x1b[1m",
@@ -39,9 +38,25 @@ enum mapColors {
     SUCCESS = <any>colors.green
 }
 
-class logger {
+abstract class Log {
+    public abstract info(): void;
+    public abstract warn(): void;
+    public abstract trace(): void;
+    public abstract error(): void;
+    public abstract success(): void;
+}
 
+export default class Logger extends Log {
+
+    private nodeLog: NodeLog;
+    private browserLog: BrowserLog;
     private readonly magic_number: number = 19;
+
+    constructor(doFileLog?: boolean, fileName?: string) {
+        super();
+        this.nodeLog = new NodeLog(doFileLog, fileName);
+        this.browserLog = new BrowserLog();
+    }
 
     public info(...msg: any[]): void {
         const args: any[] = [call.info, ...arguments];
@@ -73,16 +88,16 @@ class logger {
         const caller: string = args.shift();
         const time: string = this.getTime();
         const color: colors = mapColors[caller];
-        const header: string = `${styles.reset}${styles.bold}${color}${time} ${caller}:${styles.reset}${color}`;
+        const header: string = `${styles.reset}${styles.bold}${color}${time} ${caller}:${styles.reset}`;
 
         args.unshift(header);
 
         if (typeof process !== 'undefined') {
-            NodeLog[call[caller]].apply(this, args);
+            this.nodeLog[call[caller]].apply(this, args);
         }
 
         if (typeof window !== 'undefined') {
-            BrowserLog[call[caller]].apply(this, args);
+            this.browserLog[call[caller]].apply(this, args);
         }
     }
 
@@ -96,57 +111,65 @@ class logger {
     }
 }
 
-class BrowserLog {
+class BrowserLog extends Log {
 
-    public static info(): void {
+    public info(): void {
         console.log(console.log.apply(this, arguments) + '\n');
     }
 
-    public static warn(): void {
+    public warn(): void {
         console.warn(console.warn.apply(this, arguments) + '\n');
     }
 
-    public static trace(): void {
+    public trace(): void {
         console.trace(console.trace.apply(this, arguments) + '\n');
     }
 
-    public static error(): void {
+    public error(): void {
         console.error(console.error.apply(this, arguments) + '\n');
     }
 
-    public static success(): void {
+    public success(): void {
         console.log(console.log.apply(this, arguments) + '\n');
     }
 }
 
-class NodeLog {
+class NodeLog extends Log {
 
-    private static readonly logFileName: string = 'logger-mogger.log';
+     nodeLog: NodeLog;
 
-    public static info(): void {
-        process.stdout.write(util.format.apply(this, arguments) + '\n');
-        NodeLog.writeToFile(util.format.apply(this, arguments) + '\n');
+    constructor(
+        private doFileLog: boolean = true,
+        private fileName: string = 'logger.log')
+    {
+        super();
+        this.nodeLog = this;
     }
 
-    public static warn(): void {
+    public info(): void {
+        process.stdout.write(util.format.apply(this, arguments) + '\n');
+        this.nodeLog.writeToFile(util.format.apply(this, arguments) + '\n');    
+    }
+
+    public warn(): void {
         process.stderr.write(util.format.apply(this, arguments) + '\n');
-        NodeLog.writeToFile(util.format.apply(this, arguments) + '\n');
-
+        this.nodeLog.writeToFile(util.format.apply(this, arguments) + '\n');    
     }
 
-    public static trace(): void {
-        NodeLog.setStack.apply(this, arguments);
+    public trace(): void {
+        this.nodeLog.setStack.apply(this, arguments);
     }
 
-    public static error(): void {
-        NodeLog.setStack.apply(this, arguments);
+    public error(): void {
+        this.nodeLog.setStack.apply(this, arguments);
+
     }
-    public static success(): void {
+    public success(): void {
         process.stdout.write(util.format.apply(this, arguments) + '\n');
-        NodeLog.writeToFile(util.format.apply(this, arguments) + '\n');
+        this.nodeLog.writeToFile(util.format.apply(this, arguments) + '\n');    
     }
 
-    private static setStack(): void {
+    private setStack(): void {
         const error: Error = new Error;
         const args: any[] = [...arguments];
         const header: string = args.shift();
@@ -156,18 +179,22 @@ class NodeLog {
         error.message = util.format.apply(this, args);
 
         Error.captureStackTrace(error, this[caller]);
-        NodeLog.warn.call(this, error.stack);
+        this.nodeLog.warn.call(this, error.stack);
     }
 
-    private static writeToFile(msg: string): void {
+    private writeToFile(msg: string): void {
         try {
-            const fileExists: boolean = NodeLog.doFileExist();
+            if (!this.nodeLog.doFileLog) {
+                return;
+            }
+
+            const fileExists: boolean = this.doFileExist();
 
             if (fileExists) {
-                fs.appendFileSync(NodeLog.logFileName, msg);
+                fs.appendFileSync(this.nodeLog.fileName, msg);
 
             } else {
-                fs.writeFileSync(NodeLog.logFileName, msg);
+                fs.writeFileSync(this.nodeLog.fileName, msg);
             }
 
         } catch (error) {
@@ -175,9 +202,9 @@ class NodeLog {
         }
     }
 
-    private static doFileExist(): boolean {
+    private doFileExist(): boolean {
         try {
-            fs.accessSync(NodeLog.logFileName);
+            fs.accessSync(this.nodeLog.fileName);
             return true;
 
         } catch (error) {
@@ -185,5 +212,3 @@ class NodeLog {
         }
     }
 }
-
-export default new logger();
