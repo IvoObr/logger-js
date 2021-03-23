@@ -127,9 +127,9 @@ export default class Logger {
             if (!this.doFileLog || this.isWindow) {
                 return;
             }
-
+            msg = msg.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
             const fileExists: boolean = this.doFileExist();
-
+            
             if (fileExists) {
                 fs.appendFileSync(this.fileName, msg);
 
