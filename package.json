@@ -1,6 +1,6 @@
 {
-  "name": "@7dev-works/logger-mogger-js",
-  "version": "1.0.2",
+  "name": "@7dev-works/logger",
+  "version": "2.0.0",
   "description": "Simple JS logger",
   "main": "index.js",
   "scripts": {
@@ -18,7 +18,6 @@
   },
   "homepage": "https://github.com/IvoObr/logger-js#readme",
   "dependencies": {
-    "colors": "^1.4.0",
     "typescript": "^4.2.3"
   },
   "devDependencies": {

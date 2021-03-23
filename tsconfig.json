@@ -4,6 +4,7 @@
         "module": "commonjs",
         "inlineSourceMap": true,
         "baseUrl": "./",
+        "declaration": true,
         "allowSyntheticDefaultImports": true,
         "esModuleInterop": true,
         "moduleResolution": "node"
