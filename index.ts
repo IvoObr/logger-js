@@ -42,28 +42,26 @@ export default class Logger {
     }
 
     public info(...msg: any[]): void {
-        this.prepareAndSend(call.info, colors.white, ...msg);
+        this.prepareAndSend(call.info, colors.white, msg);
     }
 
     public warn(...msg: any[]): void {
-        this.prepareAndSend(call.warn, colors.yellow ,...msg);
+        this.prepareAndSend(call.warn, colors.yellow, msg);
     }
 
     public trace(...msg: any[]): void {
-        this.prepareAndSend(call.trace, colors.blue, ...msg)
+        this.prepareAndSend(call.trace, colors.blue, msg)
     }
 
     public error(...msg: any[]): void {
-        this.prepareAndSend(call.error, colors.red, ...msg);
+        this.prepareAndSend(call.error, colors.red, msg);
     }
 
     public success(...msg: any[]): void {
-        this.prepareAndSend(call.success, colors.green, ...msg)
+        this.prepareAndSend(call.success, colors.green, msg)
     }
 
-    private prepareAndSend(...msg: any[]): void {
-        const caller: string = msg.shift();
-        const color: colors = msg.shift();
+    private prepareAndSend(caller: any, color: colors, msg: any[]): void {
         const time: string = this.getTime();
         const header: string = `${styles.reset}${styles.bold}${this.isWindow ? '' : color}${time} ${caller}:${styles.reset}`;
         msg.unshift(header);
