@@ -4,8 +4,6 @@ import util from 'util';
 // todo readme
 
 enum colors {
-    bright = "\x1b[1m",
-    dim = "\x1b[2m",
     red = "\x1b[31m",
     green = "\x1b[32m",
     yellow = "\x1b[33m",
@@ -15,8 +13,6 @@ enum colors {
 
 enum styles {
     reset = '\x1b[0m',
-    underscore = '\x1b[4m',
-    reverse = '\x1b[7m',
     bold = '\u001b[1m'
 }
 
@@ -28,79 +24,51 @@ enum call {
     success = <any>'SUCCESS'
 }
 
-enum colorsMap {
-    INFO = <any>colors.white,
-    WARN = <any>colors.yellow,
-    TRACE = <any>colors.blue,
-    ERROR = <any>colors.red,
-    SUCCESS = <any>colors.green
-}
-
-enum logMap {
-    INFO = 'log',
-    WARN = 'warn',
-    TRACE = 'trace',
-    ERROR = 'error',
-    SUCCESS = 'log'
-}
-
 export default class Logger {
 
-    private doFileLog: boolean = true;
-    private fileName: string = 'logger.log';
-    private readonly magic_number: number = 19;
-    private readonly isWindow: boolean = false;
+    private readonly doFileLog: boolean = true;
+    private readonly _magic_number: number = 19;
+    private readonly fileName: string = 'logger.log';
 
     constructor(doFileLog?: boolean, fileName?: string) {
-        if (typeof doFileLog === 'boolean') {
-            this.doFileLog = doFileLog;
-        }
-
-        if (typeof window !== 'undefined') {
-            this.isWindow = true;
-        }
-
-        if (typeof fileName === 'string') {
-            this.fileName = fileName;
-        }
+        if (typeof fileName === 'string') this.fileName = fileName;    
+        if (typeof doFileLog === 'boolean') this.doFileLog = doFileLog;
     }
 
     public info(...msg: any[]): void {
-        this.prepareAndSend(call.info, ...msg);
+        this.prepareAndSend(call.info, colors.white, ...msg);
     }
 
     public warn(...msg: any[]): void {
-        this.prepareAndSend(call.warn, ...msg);
+        this.prepareAndSend(call.warn, colors.yellow ,...msg);
     }
 
     public trace(...msg: any[]): void {
-        this.prepareAndSend(call.trace, ...msg)
+        this.prepareAndSend(call.trace, colors.blue, ...msg)
     }
 
     public error(...msg: any[]): void {
-        this.prepareAndSend(call.error, ...msg);
+        this.prepareAndSend(call.error, colors.red, ...msg);
     }
 
     public success(...msg: any[]): void {
-        this.prepareAndSend(call.success, ...msg)
+        this.prepareAndSend(call.success, colors.green, ...msg)
     }
 
     private prepareAndSend(...msg: any[]): void {
         const caller: string = msg.shift();
+        const color: colors = msg.shift();
         const time: string = this.getTime();
-        const color: colors = colorsMap[caller];
-        const header: string = this.isWindow ?
-            `${styles.reset}${styles.bold}${time} ${caller}:${styles.reset}`
-            : `${styles.reset}${styles.bold}${color}${time} ${caller}:${styles.reset}`;
 
+        const header: string = `${styles.reset}${styles.bold}${color}${time} ${caller}:${styles.reset}`;
         msg.unshift(header);
 
-        if (logMap[caller] === 'log' || logMap[caller] === 'warn') {
-            console[logMap[caller]].apply(this, msg);
+        if (caller == 'INFO' || caller == 'WARN' || caller == 'SUCCESS') {
+            console[call[caller]] ? console[call[caller]].apply(this, msg) : console.log.apply(this, msg);
             this.writeToFile(util.format.apply(this, msg) + '\n');
         }
 
-        if (logMap[caller] === 'trace' || logMap[caller] === 'error') {
+        if (caller == 'TRACE' || caller == 'ERROR') {
                 this.setStack.apply(this, msg);
         }
     }
@@ -109,7 +77,7 @@ export default class Logger {
         const time: string = new Date()
             .toISOString()
             .replace('T', ' ')
-            .substring(0, this.magic_number);
+            .substring(0, this._magic_number);
 
         return `[${time}]`;
     }
@@ -121,11 +89,10 @@ export default class Logger {
         const caller: string = (header.indexOf('ERROR') > -1) ? 'error' : 'trace';
 
         error.name = header;
-        error.message = util?.formatWithOptions?.apply(this, [{ colors: true }, ...args])
-            || this.arrayToString(args);      
+        error.message = util?.formatWithOptions?.apply(this, [{ colors: true }, ...args]) || this.arrayToString(args);      
                    
         Error.captureStackTrace(error, this[caller]);
-        console.warn.call(this, error.stack);
+        console.error.call(this, error.stack);
         this.writeToFile(util.format.call(this, error.stack) + '\n');
     }
 
@@ -140,7 +107,7 @@ export default class Logger {
 
     private writeToFile(msg: string): void {
         try {
-            if (!this.doFileLog || this.isWindow) {
+            if (!this.doFileLog || typeof window !== 'undefined') {
                 return;
             }
 
