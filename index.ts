@@ -2,8 +2,6 @@ import fs from 'fs';
 import util from 'util';
 
 // todo readme
-// todo test all
-// todo rainbow
 
 enum colors {
     bright = "\x1b[1m",
@@ -51,11 +49,17 @@ export default class Logger {
     private doFileLog: boolean = true;
     private fileName: string = 'logger.log';
     private readonly magic_number: number = 19;
+    private readonly isWindow: boolean = false;
 
     constructor(doFileLog?: boolean, fileName?: string) {
         if (typeof doFileLog === 'boolean') {
             this.doFileLog = doFileLog;
         }
+
+        if (typeof window !== 'undefined') {
+            this.isWindow = true;
+        }
+
         if (typeof fileName === 'string') {
             this.fileName = fileName;
         }
@@ -91,25 +95,20 @@ export default class Logger {
         const caller: string = args.shift();
         const time: string = this.getTime();
         const color: colors = colorsMap[caller];
-        const header: string = `${styles.reset}${styles.bold}${color}${time} ${caller}:${styles.reset}`;
+        const header: string = this.isWindow ?
+            `${styles.reset}${styles.bold}${time} ${caller}:${styles.reset}`
+            : `${styles.reset}${styles.bold}${color}${time} ${caller}:${styles.reset}`;
 
         args.unshift(header);
 
-        if (typeof process !== 'undefined') {
-
-            if (logMap[caller] === 'log' || logMap[caller] === 'warn') {
-                console[logMap[caller]].apply(this, args);
-                this.writeToFile(util.format.apply(this, args) + '\n');
-            }
-
-            if (logMap[caller] === 'trace' || logMap[caller] === 'error') {
-                 this.setStack.apply(this, args);
-            }
+        if (logMap[caller] === 'log' || logMap[caller] === 'warn') {
+            console[logMap[caller]].apply(this, args);
+            this.writeToFile(util.format.apply(this, args) + '\n');
         }
-     
-        // if(typeof window !== 'undefined') {
-        //     BrowserLog[call[caller]].apply(this, args);
-        // }
+
+        if (logMap[caller] === 'trace' || logMap[caller] === 'error') {
+                this.setStack.apply(this, args);
+        }
     }
 
     private getTime(): string {
@@ -128,16 +127,25 @@ export default class Logger {
         const caller: string = (header.indexOf('ERROR') > -1) ? 'error' : 'trace';
 
         error.name = header;
-        error.message = util.formatWithOptions.apply(this, [{ colors: true }, ...args]);
-
+        error.message = util?.formatWithOptions?.apply(this, [{ colors: true }, ...args])
+            || this.arrayToString(args);      
+                   
         Error.captureStackTrace(error, this[caller]);
         console.warn.call(this, error.stack);
         this.writeToFile(util.format.call(this, error.stack) + '\n');
     }
 
+    private arrayToString(array: any[]): string {
+        let result: string = '';
+        for (let index: number = 0; index < array.length; index++) {
+            result += JSON.stringify(array[index]) + ' ';  
+        }
+        return result;
+    }
+
     private writeToFile(msg: string): void {
         try {
-            if (!this.doFileLog) {
+            if (!this.doFileLog || this.isWindow) {
                 return;
             }
 
@@ -163,28 +171,5 @@ export default class Logger {
         } catch (error) {
             return false;
         }
-    }
-}
-
-class BrowserLog {
-
-    public static info(): void {
-        console.log(console.log.apply(this, arguments) + '\n');
-    }
-
-    public static warn(): void {
-        console.warn(console.warn.apply(this, arguments) + '\n');
-    }
-
-    public static trace(): void {
-        console.trace(console.trace.apply(this, arguments) + '\n');
-    }
-
-    public static error(): void {
-        console.error(console.error.apply(this, arguments) + '\n');
-    }
-
-    public static success(): void {
-        console.log(console.log.apply(this, arguments) + '\n');
     }
 }

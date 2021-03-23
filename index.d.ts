@@ -2,6 +2,7 @@ export default class Logger {
     private doFileLog;
     private fileName;
     private readonly magic_number;
+    private readonly isWindow;
     constructor(doFileLog?: boolean, fileName?: string);
     info(...msg: any[]): void;
     warn(...msg: any[]): void;
@@ -11,6 +12,7 @@ export default class Logger {
     private prepareAndSend;
     private getTime;
     private setStack;
+    private arrayToString;
     private writeToFile;
     private doFileExist;
 }
