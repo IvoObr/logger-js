@@ -1,8 +1,6 @@
 import fs from 'fs';
 import util from 'util';
 
-// todo readme
-
 enum colors {
     red = "\x1b[31m",
     green = "\x1b[32m",
