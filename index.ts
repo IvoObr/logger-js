@@ -66,48 +66,42 @@ export default class Logger {
     }
 
     public info(...msg: any[]): void {
-        const args: any[] = [call.info, ...arguments];
-        this.prepareAndSend.apply(this, args);
+        this.prepareAndSend(call.info, ...msg);
     }
 
     public warn(...msg: any[]): void {
-        const args: any[] = [call.warn, ...arguments];
-        this.prepareAndSend.apply(this, args);
+        this.prepareAndSend(call.warn, ...msg);
     }
 
     public trace(...msg: any[]): void {
-        const args: any[] = [call.trace, ...arguments];
-        this.prepareAndSend.apply(this, args);
+        this.prepareAndSend(call.trace, ...msg)
     }
 
     public error(...msg: any[]): void {
-        const args: any[] = [call.error, ...arguments];
-        this.prepareAndSend.apply(this, args);
+        this.prepareAndSend(call.error, ...msg);
     }
 
     public success(...msg: any[]): void {
-        const args: any[] = [call.success, ...arguments];
-        this.prepareAndSend.apply(this, args);
+        this.prepareAndSend(call.success, ...msg)
     }
 
-    private prepareAndSend(): void {
-        const args: any[] = [...arguments];
-        const caller: string = args.shift();
+    private prepareAndSend(...msg: any[]): void {
+        const caller: string = msg.shift();
         const time: string = this.getTime();
         const color: colors = colorsMap[caller];
         const header: string = this.isWindow ?
             `${styles.reset}${styles.bold}${time} ${caller}:${styles.reset}`
             : `${styles.reset}${styles.bold}${color}${time} ${caller}:${styles.reset}`;
 
-        args.unshift(header);
+        msg.unshift(header);
 
         if (logMap[caller] === 'log' || logMap[caller] === 'warn') {
-            console[logMap[caller]].apply(this, args);
-            this.writeToFile(util.format.apply(this, args) + '\n');
+            console[logMap[caller]].apply(this, msg);
+            this.writeToFile(util.format.apply(this, msg) + '\n');
         }
 
         if (logMap[caller] === 'trace' || logMap[caller] === 'error') {
-                this.setStack.apply(this, args);
+                this.setStack.apply(this, msg);
         }
     }
 
@@ -137,6 +131,7 @@ export default class Logger {
 
     private arrayToString(array: any[]): string {
         let result: string = '';
+
         for (let index: number = 0; index < array.length; index++) {
             result += JSON.stringify(array[index]) + ' ';  
         }
