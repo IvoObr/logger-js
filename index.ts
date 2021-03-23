@@ -4,7 +4,6 @@ import util from 'util';
 // todo readme
 // todo test all
 // todo rainbow
-// todo local date
 
 enum colors {
     bright = "\x1b[1m",
@@ -31,7 +30,7 @@ enum call {
     success = <any>'SUCCESS'
 }
 
-enum mapColors {
+enum colorsMap {
     INFO = <any>colors.white,
     WARN = <any>colors.yellow,
     TRACE = <any>colors.blue,
@@ -39,17 +38,27 @@ enum mapColors {
     SUCCESS = <any>colors.green
 }
 
+enum logMap {
+    INFO = 'log',
+    WARN = 'warn',
+    TRACE = 'trace',
+    ERROR = 'error',
+    SUCCESS = 'log'
+}
+
 export default class Logger {
 
+    private doFileLog: boolean = true;
+    private fileName: string = 'logger.log';
     private readonly magic_number: number = 19;
 
     constructor(doFileLog?: boolean, fileName?: string) {
         if (typeof doFileLog === 'boolean') {
-            NodeLog.doFileLog = doFileLog;
-        }  
+            this.doFileLog = doFileLog;
+        }
         if (typeof fileName === 'string') {
-            NodeLog.fileName = fileName;
-        } 
+            this.fileName = fileName;
+        }
     }
 
     public info(...msg: any[]): void {
@@ -81,18 +90,26 @@ export default class Logger {
         const args: any[] = [...arguments];
         const caller: string = args.shift();
         const time: string = this.getTime();
-        const color: colors = mapColors[caller];
+        const color: colors = colorsMap[caller];
         const header: string = `${styles.reset}${styles.bold}${color}${time} ${caller}:${styles.reset}`;
 
         args.unshift(header);
 
         if (typeof process !== 'undefined') {
-            NodeLog[call[caller]].apply(this, args);
-        }
 
-        if (typeof window !== 'undefined') {
-            BrowserLog[call[caller]].apply(this, args);
+            if (logMap[caller] === 'log' || logMap[caller] === 'warn') {
+                console[logMap[caller]].apply(this, args);
+                this.writeToFile(util.format.apply(this, args) + '\n');
+            }
+
+            if (logMap[caller] === 'trace' || logMap[caller] === 'error') {
+                 this.setStack.apply(this, args);
+            }
         }
+     
+        // if(typeof window !== 'undefined') {
+        //     BrowserLog[call[caller]].apply(this, args);
+        // }
     }
 
     private getTime(): string {
@@ -102,6 +119,50 @@ export default class Logger {
             .substring(0, this.magic_number);
 
         return `[${time}]`;
+    }
+
+    private setStack(): void {
+        const error: Error = new Error;
+        const args: any[] = [...arguments];
+        const header: string = args.shift();
+        const caller: string = (header.indexOf('ERROR') > -1) ? 'error' : 'trace';
+
+        error.name = header;
+        error.message = util.formatWithOptions.apply(this, [{ colors: true }, ...args]);
+
+        Error.captureStackTrace(error, this[caller]);
+        console.warn.call(this, error.stack);
+        this.writeToFile(util.format.call(this, error.stack) + '\n');
+    }
+
+    private writeToFile(msg: string): void {
+        try {
+            if (!this.doFileLog) {
+                return;
+            }
+
+            const fileExists: boolean = this.doFileExist();
+
+            if (fileExists) {
+                fs.appendFileSync(this.fileName, msg);
+
+            } else {
+                fs.writeFileSync(this.fileName, msg);
+            }
+
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    private doFileExist(): boolean {
+        try {
+            fs.accessSync(this.fileName);
+            return true;
+
+        } catch (error) {
+            return false;
+        }
     }
 }
 
@@ -125,77 +186,5 @@ class BrowserLog {
 
     public static success(): void {
         console.log(console.log.apply(this, arguments) + '\n');
-    }
-}
-
-class NodeLog {
-
-    public static doFileLog: boolean = true;
-    public static fileName: string = 'logger.log';
-
-    public static info(msg): void {
-        process.stdout.write(util.format.apply(this, arguments) + '\n');
-        NodeLog.writeToFile(util.format.apply(this, arguments) + '\n');    
-    }
-
-    public static warn(): void {
-        process.stderr.write(util.format.apply(this, arguments) + '\n');
-        NodeLog.writeToFile(util.format.apply(this, arguments) + '\n');    
-    }
-
-    public static trace(): void {
-        NodeLog.setStack.apply(this, arguments);
-    }
-
-    public static error(): void {
-        NodeLog.setStack.apply(this, arguments);
-
-    }
-    public static success(): void {
-        process.stdout.write(util.format.apply(this, arguments) + '\n');
-        NodeLog.writeToFile(util.format.apply(this, arguments) + '\n');    
-    }
-
-    private static setStack(): void {
-        const error: Error = new Error;
-        const args: any[] = [...arguments];
-        const header: string = args.shift();
-        const caller: string = (header.indexOf('ERROR') > -1) ? 'error' : 'trace';
-
-        error.name = header;
-        error.message = util.format.apply(this, args);
-
-        Error.captureStackTrace(error, this[caller]);
-        NodeLog.warn.call(this, error.stack);
-    }
-
-    private static writeToFile(msg: string): void {
-        try {
-            if (!NodeLog.doFileLog) {
-                return;
-            }
-
-            const fileExists: boolean = this.doFileExist();
-
-            if (fileExists) {
-                fs.appendFileSync(NodeLog.fileName, msg);
-
-            } else {
-                fs.writeFileSync(NodeLog.fileName, msg);
-            }
-
-        } catch (error) {
-            console.error(error);
-        }
-    }
-
-    private static doFileExist(): boolean {
-        try {
-            fs.accessSync(NodeLog.fileName);
-            return true;
-
-        } catch (error) {
-            return false;
-        }
     }
 }
