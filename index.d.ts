@@ -1,5 +1,6 @@
 export default class Logger {
     private readonly doFileLog;
+    private readonly isWindow;
     private readonly _magic_number;
     private readonly fileName;
     constructor(doFileLog?: boolean, fileName?: string);

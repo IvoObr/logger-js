@@ -27,12 +27,20 @@ enum call {
 export default class Logger {
 
     private readonly doFileLog: boolean = true;
+    private readonly isWindow: boolean = false;
     private readonly _magic_number: number = 19;
     private readonly fileName: string = 'logger.log';
 
     constructor(doFileLog?: boolean, fileName?: string) {
-        if (typeof fileName === 'string') this.fileName = fileName;    
-        if (typeof doFileLog === 'boolean') this.doFileLog = doFileLog;
+        if (typeof window !== 'undefined') {
+            this.isWindow = true;
+        }
+        if (typeof fileName === 'string') {
+            this.fileName = fileName;    
+        }
+        if (typeof doFileLog === 'boolean') {
+            this.doFileLog = doFileLog;
+        }
     }
 
     public info(...msg: any[]): void {
@@ -59,17 +67,21 @@ export default class Logger {
         const caller: string = msg.shift();
         const color: colors = msg.shift();
         const time: string = this.getTime();
-
-        const header: string = `${styles.reset}${styles.bold}${color}${time} ${caller}:${styles.reset}`;
+        const header: string = `${styles.reset}${styles.bold}${this.isWindow ? '' : color}${time} ${caller}:${styles.reset}`;
         msg.unshift(header);
 
-        if (caller == 'INFO' || caller == 'WARN' || caller == 'SUCCESS') {
-            console[call[caller]] ? console[call[caller]].apply(this, msg) : console.log.apply(this, msg);
+        if (caller == 'INFO' || caller == 'WARN') {
+            console[call[caller]].apply(this, msg);
+            this.writeToFile(util.format.apply(this, msg) + '\n');
+        }
+
+        if (caller == 'SUCCESS') {
+            console.log.apply(this, msg);
             this.writeToFile(util.format.apply(this, msg) + '\n');
         }
 
         if (caller == 'TRACE' || caller == 'ERROR') {
-                this.setStack.apply(this, msg);
+            this.setStack.apply(this, msg);
         }
     }
 
@@ -86,13 +98,18 @@ export default class Logger {
         const error: Error = new Error;
         const args: any[] = [...arguments];
         const header: string = args.shift();
-        const caller: string = (header.indexOf('ERROR') > -1) ? 'error' : 'trace';
-
-        error.name = header;
-        error.message = util?.formatWithOptions?.apply(this, [{ colors: true }, ...args]) || this.arrayToString(args);      
-                   
+        const caller: string = header.includes('ERROR') ? 'error' : 'trace';
+        error.name = header; 
         Error.captureStackTrace(error, this[caller]);
-        console.error.call(this, error.stack);
+
+        if (this.isWindow) {
+            error.message = this.arrayToString(args);
+            console[caller].call(this, error.stack);
+        } else {
+            error.message = util.formatWithOptions.apply(this, [{ colors: true }, ...args]); 
+            console.error.call(this, error.stack);
+        }
+
         this.writeToFile(util.format.call(this, error.stack) + '\n');
     }
 
@@ -107,7 +124,7 @@ export default class Logger {
 
     private writeToFile(msg: string): void {
         try {
-            if (!this.doFileLog || typeof window !== 'undefined') {
+            if (!this.doFileLog || this.isWindow) {
                 return;
             }
 
