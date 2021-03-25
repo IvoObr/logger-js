@@ -34,7 +34,7 @@ export default class Logger {
             this.isWindow = true;
         }
         if (typeof fileName === 'string') {
-            this.fileName = fileName;    
+            this.fileName = fileName;
         }
         if (typeof doFileLog === 'boolean') {
             this.doFileLog = doFileLog;
@@ -67,17 +67,17 @@ export default class Logger {
         msg.unshift(header);
 
         if (caller == 'INFO' || caller == 'WARN') {
-            console[call[caller]].apply(this, msg);
-            this.writeToFile(util.format.apply(this, msg) + '\n');
+            (console as any)[call[caller]].apply(this, msg);
+            this.writeToFile(util.format.apply(this, msg as any) + '\n');
         }
 
         if (caller == 'SUCCESS') {
             console.log.apply(this, msg);
-            this.writeToFile(util.format.apply(this, msg) + '\n');
+            this.writeToFile(util.format.apply(this, msg as any) + '\n');
         }
 
         if (caller == 'TRACE' || caller == 'ERROR') {
-            this.setStack.apply(this, msg);
+            (this.setStack as any).apply(this, msg);
         }
     }
 
@@ -95,25 +95,25 @@ export default class Logger {
         const args: any[] = [...arguments];
         const header: string = args.shift();
         const caller: string = header.includes('ERROR') ? 'error' : 'trace';
-        error.name = header; 
-        Error.captureStackTrace(error, this[caller]);
+        error.name = header;
+        Error.captureStackTrace(error, (this as any)[caller]);
 
         if (this.isWindow) {
             error.message = this.arrayToString(args);
-            console[caller].call(this, error.stack);
+            (console as any)[caller].call(this, error.stack);
         } else {
-            error.message = util.formatWithOptions.apply(this, [{ colors: true }, ...args]); 
-            console.error.call(this, error.stack);
+            error.message = (util.formatWithOptions as any).apply(this, [{ colors: true }, ...args]);
+            (console as any).error.call(this, error.stack);
         }
 
-        this.writeToFile(util.format.call(this, error.stack) + '\n');
+        this.writeToFile((util.format as any).call(this, error.stack) + '\n');
     }
 
     private arrayToString(array: any[]): string {
         let result: string = '';
 
         for (let index: number = 0; index < array.length; index++) {
-            result += JSON.stringify(array[index]) + ' ';  
+            result += JSON.stringify(array[index]) + ' ';
         }
         return result;
     }
@@ -125,7 +125,7 @@ export default class Logger {
             }
             msg = msg.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
             const fileExists: boolean = this.doFileExist();
-            
+
             if (fileExists) {
                 fs.appendFileSync(this.fileName, msg);
 
