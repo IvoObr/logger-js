@@ -1,4 +1,4 @@
-export default class Logger {
+export declare class Logger {
     private readonly doFileLog;
     private readonly isWindow;
     private readonly _magic_number;
@@ -12,9 +12,9 @@ export default class Logger {
     error(...msg: any[]): void;
     success(...msg: any[]): void;
     private prepareAndSend;
+    private stringifyObjects;
     private getTime;
     private setStack;
-    private arrayToString;
     private writeToFile;
     private doFileExist;
 }

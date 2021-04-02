@@ -22,8 +22,7 @@ enum call {
     success = <any>'SUCCESS'
 }
 
-export default class Logger {
-
+export class Logger {
     private readonly doFileLog: boolean = true;
     private readonly isWindow: boolean = false;
     private readonly _magic_number: number = 19;
@@ -74,6 +73,7 @@ export default class Logger {
         const time: string = this.getTime();
         const header: string = `${styles.reset}${styles.bold}${this.isWindow ? '' : color}${time} ${caller}:${styles.reset}`;
         msg.unshift(header);
+        msg = this.stringifyObjects(msg);
 
         if (caller == 'INFO' || caller == 'WARN') {
             (console as any)[call[caller]].apply(this, msg);
@@ -90,6 +90,12 @@ export default class Logger {
         }
     }
 
+    private stringifyObjects(msg: any[]): any[] {
+        return msg.map((el: any): any =>
+            typeof el === 'object' ?
+            JSON.stringify(el) : el)
+    }
+
     private getTime(): string {
         const time: string = new Date()
             .toISOString()
@@ -104,27 +110,14 @@ export default class Logger {
         const args: any[] = [...arguments];
         const header: string = args.shift();
         const caller: string = header.includes('ERROR') ? 'error' : 'trace';
-        error.name = header;
+        const method: string = (this.isWindow) ? caller : 'error';
+
+        error.name = header;       
+        error.message = args.join(' ')
+
         Error.captureStackTrace(error, (this as any)[caller]);
-
-        if (this.isWindow) {
-            error.message = this.arrayToString(args);
-            (console as any)[caller].call(this, error.stack);
-        } else {
-            error.message = (util.formatWithOptions as any).apply(this, [{ colors: true }, ...args]);
-            (console as any).error.call(this, error.stack);
-        }
-
+        (console as any)[method].call(this, error.stack);
         this.writeToFile((util.format as any).call(this, error.stack) + '\n');
-    }
-
-    private arrayToString(array: any[]): string {
-        let result: string = '';
-
-        for (let index: number = 0; index < array.length; index++) {
-            result += JSON.stringify(array[index]) + ' ';
-        }
-        return result;
     }
 
     private writeToFile(msg: string): void {
@@ -132,7 +125,7 @@ export default class Logger {
             if (!this.doFileLog || this.isWindow) {
                 return;
             }
-            msg = msg.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+            msg = msg.replace(/\u001b\[.*?m/g, '');
             const fileExists: boolean = this.doFileExist();
 
             if (fileExists) {

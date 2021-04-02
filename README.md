@@ -4,12 +4,12 @@ Supports Browser, NodeJS and TypeScript
 _________________________________________________________________
 
 ### Features
-#### All methods:
 * print fully arrays and objects
 * accept multiple arguments
 * trace and error have stack
 * have timestamp
-* includes TypeScript definitions
+* include TypeScript definitions
+* file names for NodeJS have timestamp
 
 
 _________________________________________________________________
@@ -23,7 +23,9 @@ _________________________________________________________________
 
 > logger.js
 ```javascript
-import Logger from '@7dev-works/logger';
+import { Logger } from '@7dev-works/logger';
+// OR 
+const { Logger } = require('@7dev-works/logger');
 
 /**
  * @param {boolean} doFileLog? optional - Should write in file on the disc.
@@ -42,22 +44,23 @@ import logger from './logger.js'; // your logger instance
 
 const obj = {
     key: 'value1',
-    arr: [1,2,3, []]
+    inner: { test: 1 },
+    arr: [1, []]
 };
 
-logger.info('info message', obj);
-logger.warn('warn message', obj, arr);
-logger.success('success message', obj);
-logger.trace('trace message', obj);
-logger.error('error message', obj);
+logger.info('info', obj, 'message');
+logger.warn('warn', obj, 'message');
+logger.success('success', obj, 'message');
+logger.trace('trace', obj, 'message');
+logger.error('error', obj, 'message');
 
 // output 
-[2021-03-23 16:21:05] INFO: info message { key: 'value1', arr: [ 1, 2, 3, [] ] }
-[2021-03-23 16:21:05] WARN: warn message { key: 'value1', arr: [ 1, 2, 3, [] ] }
-[2021-03-23 16:21:05] SUCCESS: success message { key: 'value1', arr: [ 1, 2, 3, [] ] }
-[2021-03-23 16:21:05] TRACE:: trace message { key: 'value1', arr: [ 1, 2, 3, [] ] } 
+[2021-04-02 19:52:54] INFO: info {"key":"value1","inner":{"test":1},"arr":[1,[]]} message
+[2021-04-02 19:52:54] WARN: warn {"key":"value1","inner":{"test":1},"arr":[1,[]]} message
+[2021-04-02 19:52:54] SUCCESS: success {"key":"value1","inner":{"test":1},"arr":[1,[]]} message
+[2021-04-02 19:52:54] TRACE:: trace {"key":"value1","inner":{"test":1},"arr":[1,[]]} message
     at Object.<anonymous> ...
-[2021-03-23 16:21:05] ERROR:: error message { key: 'value1', arr: [ 1, 2, 3, [] ] }
-    at Object.<anonymous> ....
+[2021-04-02 19:52:54] ERROR:: error {"key":"value1","inner":{"test":1},"arr":[1,[]]} message
+    at Object.<anonymous> ...
 ```
 _________________________________________________________________
