@@ -2,7 +2,9 @@ export default class Logger {
     private readonly doFileLog;
     private readonly isWindow;
     private readonly _magic_number;
-    private readonly fileName;
+    private _fileName;
+    get fileName(): string;
+    set fileName(fileName: string);
     constructor(doFileLog?: boolean, fileName?: string);
     info(...msg: any[]): void;
     warn(...msg: any[]): void;

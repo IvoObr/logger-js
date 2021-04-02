@@ -27,7 +27,16 @@ export default class Logger {
     private readonly doFileLog: boolean = true;
     private readonly isWindow: boolean = false;
     private readonly _magic_number: number = 19;
-    private readonly fileName: string = 'logger.log';
+    private _fileName: string = 'logger.log';
+
+    get fileName() {
+        const date: string = new Date().toISOString().split('T')[0]
+        return `${date}-${this._fileName}`;
+    }
+
+    set fileName(fileName: string) {
+        this._fileName = fileName;
+    }
 
     constructor(doFileLog?: boolean, fileName?: string) {
         if (typeof window !== 'undefined') {
