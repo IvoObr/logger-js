@@ -93,7 +93,7 @@ export class Logger {
     private stringifyObjects(msg: any[]): any[] {
         return msg.map((el: any): any =>
             typeof el === 'object' ?
-            JSON.stringify(el) : el)
+            JSON.stringify(el) : el ?? 'undefined')
     }
 
     private getTime(): string {
@@ -113,7 +113,7 @@ export class Logger {
         const method: string = (this.isWindow) ? caller : 'error';
 
         error.name = header;       
-        error.message = args.join(' ')
+        error.message = args.join(' ');
 
         Error.captureStackTrace(error, (this as any)[caller]);
         (console as any)[method].call(this, error.stack);
