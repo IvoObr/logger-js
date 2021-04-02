@@ -29,12 +29,12 @@ export default class Logger {
     private readonly _magic_number: number = 19;
     private _fileName: string = 'logger.log';
 
-    get fileName() {
+    private get fileName() {
         const date: string = new Date().toISOString().split('T')[0]
         return `${date}-${this._fileName}`;
     }
 
-    set fileName(fileName: string) {
+    private set fileName(fileName: string) {
         this._fileName = fileName;
     }
 
