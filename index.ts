@@ -101,7 +101,6 @@ export class Logger {
             .toISOString()
             .replace('T', ' ')
             .substring(0, this._magic_number);
-
         return `[${time}]`;
     }
 
@@ -110,7 +109,7 @@ export class Logger {
         const args: any[] = [...arguments];
         const header: string = args.shift();
         const caller: string = header.includes('ERROR') ? 'error' : 'trace';
-        const method: string = (this.isWindow) ? caller : 'error';
+        const method: string = this.isWindow ? caller : 'error';
 
         error.name = header;       
         error.message = args.join(' ');
@@ -126,11 +125,10 @@ export class Logger {
                 return;
             }
             msg = msg.replace(/\u001b\[.*?m/g, '');
-            const fileExists: boolean = this.doFileExist();
-
-            if (fileExists) {
+            
+            if (this.fileExists()) {
                 fs.appendFileSync(this.fileName, msg);
-
+                
             } else {
                 fs.writeFileSync(this.fileName, msg);
             }
@@ -140,7 +138,7 @@ export class Logger {
         }
     }
 
-    private doFileExist(): boolean {
+    private fileExists(): boolean {
         try {
             fs.accessSync(this.fileName);
             return true;
