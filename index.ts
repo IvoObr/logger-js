@@ -86,7 +86,7 @@ export class Logger {
         msg.unshift(header);
         msg = this.stringifyObjects(msg);
 
-        if (caller == 'INFO' || caller == 'WARN') {
+        if (caller == 'INFO' || caller == 'WARN' || caller == 'ERROR') {
             (console as any)[call[caller]].apply(this, msg);
             this.writeToFile(util.format.apply(this, msg as any) + '\n');
         }
@@ -96,15 +96,14 @@ export class Logger {
             this.writeToFile(util.format.apply(this, msg as any) + '\n');
         }
 
-        if (caller == 'TRACE' || caller == 'ERROR') {
+        if (caller == 'TRACE') {     
             (this.setStack as any).apply(this, msg);
         }
     }
 
     private stringifyObjects(msg: any[]): any[] {
-        return msg.map((el: any): any =>
-            typeof el === 'object' ?
-            JSON.stringify(el) : el ?? 'undefined')
+        return  msg.map((el: any): any => 
+            (el?.constructor === Object) ? JSON.stringify(el) : el);
     }
 
     private getTime(): string {
@@ -119,14 +118,12 @@ export class Logger {
         const error: Error = new Error;
         const args: any[] = [...arguments];
         const header: string = args.shift();
-        const caller: string = header.includes('ERROR') ? 'error' : 'trace';
-        const method: string = this.isWindow ? caller : 'error';
 
         error.name = header;       
         error.message = args.join(' ');
 
-        Error.captureStackTrace(error, (this as any)[caller]);
-        (console as any)[method].call(this, error.stack);
+        Error.captureStackTrace(error, this.trace);
+        console.trace.call(this, error.stack);
         this.writeToFile((util.format as any).call(this, error.stack) + '\n');
     }
 
