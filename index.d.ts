@@ -1,11 +1,17 @@
+export interface ILogOptions {
+    logInFile?: boolean;
+    useColor?: boolean;
+    fileName?: string;
+}
 export declare class Logger {
-    private readonly doFileLog;
+    private _fileName;
+    private readonly useColor;
+    private readonly logInFile;
     private readonly isWindow;
     private readonly _magic_number;
-    private _fileName;
     private get fileName();
     private set fileName(value);
-    constructor(doFileLog?: boolean, fileName?: string);
+    constructor(options?: ILogOptions);
     info(...msg: any[]): void;
     warn(...msg: any[]): void;
     trace(...msg: any[]): void;

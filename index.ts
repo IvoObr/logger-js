@@ -22,11 +22,19 @@ enum call {
     success = <any>'SUCCESS'
 }
 
+export interface ILogOptions {
+    logInFile?: boolean;
+    useColor?: boolean;
+    fileName?: string;
+}
+
 export class Logger {
-    private readonly doFileLog: boolean = true;
+
+    private _fileName: string = 'logger.log';
+    private readonly useColor: boolean = true;
+    private readonly logInFile: boolean = true;
     private readonly isWindow: boolean = false;
     private readonly _magic_number: number = 19;
-    private _fileName: string = 'logger.log';
 
     private get fileName() {
         const date: string = new Date().toISOString().split('T')[0]
@@ -37,15 +45,18 @@ export class Logger {
         this._fileName = fileName;
     }
 
-    constructor(doFileLog?: boolean, fileName?: string) {
+    constructor(options?: ILogOptions) {
         if (typeof window !== 'undefined') {
             this.isWindow = true;
         }
-        if (typeof fileName === 'string') {
-            this.fileName = fileName;
+        if (typeof options?.fileName === 'string') {
+            this.fileName = options.fileName;
         }
-        if (typeof doFileLog === 'boolean') {
-            this.doFileLog = doFileLog;
+        if (typeof options?.logInFile === 'boolean') {
+            this.logInFile = options.logInFile;
+        }
+        if (typeof options?.useColor === 'boolean') {
+            this.useColor = options.useColor;
         }
     }
 
@@ -71,7 +82,7 @@ export class Logger {
 
     private prepareAndSend(caller: any, color: colors, msg: any[]): void {
         const time: string = this.getTime();
-        const header: string = `${styles.reset}${styles.bold}${this.isWindow ? '' : color}${time} ${caller}:${styles.reset}`;
+        const header: string = `${styles.reset}${styles.bold}${this.useColor ? color : ''}${time} ${caller}:${styles.reset}`;
         msg.unshift(header);
         msg = this.stringifyObjects(msg);
 
@@ -121,7 +132,7 @@ export class Logger {
 
     private writeToFile(msg: string): void {
         try {
-            if (!this.doFileLog || this.isWindow) {
+            if (!this.logInFile || this.isWindow) {
                 return;
             }
             msg = msg.replace(/\u001b\[.*?m/g, '');

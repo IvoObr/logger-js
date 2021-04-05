@@ -21,26 +21,33 @@ _________________________________________________________________
 
 ### Example
 
-> logger.js
-```javascript
-import { Logger } from '@7dev-works/logger';
+> logger.ts
+```typescript
+import { Logger, ILogOptions } from '@7dev-works/logger';
 // OR 
-const { Logger } = require('@7dev-works/logger');
+const { Logger } = require('@7dev-works/logger'); // no options interface available
 
-/**
- * @param {boolean} doFileLog? optional - Should write in file on the disc.
- * @param {string} fileName? optional - The name of the file.
- * @return {Logger} instance of the Logger class.
+
+/** ILogOptions
+ * @prop {boolean} useColor? optional -  Should use colors.
+ * @prop {string} fileName? optional - The name of the file.
+ * @prop {boolean} logInFile? optional - Should write in file on the disc.
  */
 
-const logger = new Logger(true, 'logger.log'); // or simply ...new Logger()
+const options: ILogOptions = {
+    useColor: true,
+    logInFile: true,
+    fileName: 'rest-server.log'
+};
+
+const logger: Logger = new Logger(options);// or simply ...new Logger()
 
 export default logger;
 ```
 
 > somewhere in you project...
-```javascript
-import logger from './logger.js'; // your logger instance
+```typescript
+import logger from './logger.ts'; // your logger instance
 
 const obj = {
     key: 'value1',
