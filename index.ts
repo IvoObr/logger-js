@@ -6,7 +6,8 @@ enum colors {
     green = "\x1b[32m",
     yellow = "\x1b[33m",
     blue = "\x1b[34m",
-    white = "\x1b[37m"
+    white = "\x1b[37m",
+    cyan = "\x1b[36m"
 }
 
 enum styles {
@@ -19,13 +20,17 @@ enum call {
     warn = <any>'WARN',
     trace = <any>'TRACE',
     error = <any>'ERROR',
+    debug = <any>'DEBUG',
     success = <any>'SUCCESS'
 }
+
+type level = 'debug' | 'prod';
 
 export interface ILogOptions {
     logInFile?: boolean;
     useColor?: boolean;
     fileName?: string;
+    logLevel?: string;
 }
 
 export class Logger {
@@ -34,6 +39,7 @@ export class Logger {
     private readonly useColor: boolean = true;
     private readonly logInFile: boolean = true;
     private readonly isWindow: boolean = false;
+    private readonly logLevel: level = 'prod';
     private readonly _magic_number: number = 19;
 
     private get fileName() {
@@ -49,14 +55,17 @@ export class Logger {
         if (typeof window !== 'undefined') {
             this.isWindow = true;
         }
+        if (options?.logLevel === 'debug') {
+            this.logLevel = options.logLevel;
+        }
         if (typeof options?.fileName === 'string') {
             this.fileName = options.fileName;
         }
-        if (typeof options?.logInFile === 'boolean') {
-            this.logInFile = options.logInFile;
-        }
         if (typeof options?.useColor === 'boolean') {
             this.useColor = options.useColor;
+        }
+        if (typeof options?.logInFile === 'boolean') {
+            this.logInFile = options.logInFile;
         }
     }
 
@@ -76,6 +85,10 @@ export class Logger {
         this.prepareAndSend(call.error, colors.red, msg);
     }
 
+    public debug(...msg: any[]): void {
+        this.prepareAndSend(call.debug, colors.cyan, msg)
+    }
+
     public success(...msg: any[]): void {
         this.prepareAndSend(call.success, colors.green, msg)
     }
@@ -86,18 +99,23 @@ export class Logger {
         msg.unshift(header);
         msg = this.stringifyObjects(msg);
 
-        if (caller == 'INFO' || caller == 'WARN' || caller == 'ERROR') {
+        if (caller === call.info || caller === call.warn || caller === call.error) {
             (console as any)[call[caller]].apply(this, msg);
             this.writeToFile(util.format.apply(this, msg as any) + '\n');
         }
 
-        if (caller == 'SUCCESS') {
+        if (caller === call.success) {
             console.log.apply(this, msg);
             this.writeToFile(util.format.apply(this, msg as any) + '\n');
         }
 
-        if (caller == 'TRACE') {     
+        if (caller === call.trace) {     
             (this.setStack as any).apply(this, msg);
+        }
+
+        if (caller === call.debug && this.logLevel === 'debug') {
+            console.debug.apply(this, msg);
+            this.writeToFile(util.format.apply(this, msg as any) + '\n');
         }
     }
 
@@ -118,12 +136,13 @@ export class Logger {
         const error: Error = new Error;
         const args: any[] = [...arguments];
         const header: string = args.shift();
+        const caller: string = this.isWindow ? 'trace' : 'log';
 
         error.name = header;       
         error.message = args.join(' ');
 
         Error.captureStackTrace(error, this.trace);
-        console.trace.call(this, error.stack);
+        (console as any)[caller].call(this, error.stack);
         this.writeToFile((util.format as any).call(this, error.stack) + '\n');
     }
 
