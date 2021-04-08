@@ -1,23 +1,18 @@
 ## Logger :rocket:
 ##### Simple JS logger
 Supports Browser, NodeJS and TypeScript
-___
+
+> $ npm install @7dev-works/logger
 
 ###  Features :loudspeaker:
 
-- [x] print fully arrays and objects
-- [x] accept multiple arguments
-- [x] trace and error have stack
-- [x] debug level mode
-- [x] have timestamp
-- [x] include TypeScript definitions
-- [x] logs in timestamped files on the disc (NodeJS)
-
-|
----|
-$ npm install @7dev-works/logger|
-|
-
+* print fully arrays and objects
+* accept multiple arguments
+* trace and error have stack
+* debug level mode
+* have timestamp
+* include TypeScript definitions
+* logs in timestamped files on the disc (NodeJS)
 
 ### Example
 
@@ -81,4 +76,4 @@ logger.success('success', obj, 'msg');
 ```
 
 
-### Happy coding! <:beer:/>
+## Happy coding!  <:beer:/>
