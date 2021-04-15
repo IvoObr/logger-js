@@ -1,6 +1,6 @@
 {
     "name": "@7dev-works/logger",
-    "version": "2.2.3",
+    "version": "2.2.4",
     "description": "Simple JS logger",
     "main": "index.js",
     "files": [

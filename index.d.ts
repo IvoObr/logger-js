@@ -25,5 +25,4 @@ export declare class Logger {
     private getTime;
     private setStack;
     private writeToFile;
-    private fileExists;
 }

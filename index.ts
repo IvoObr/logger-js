@@ -152,26 +152,10 @@ export class Logger {
                 return;
             }
             msg = msg.replace(/\u001b\[.*?m/g, '');
-            
-            if (this.fileExists()) {
-                fs.appendFileSync(this.fileName, msg);
-                
-            } else {
-                fs.writeFileSync(this.fileName, msg);
-            }
+            fs.writeFileSync(this.fileName, msg, { flag: 'a'});
 
         } catch (error) {
             console.error(error);
-        }
-    }
-
-    private fileExists(): boolean {
-        try {
-            fs.accessSync(this.fileName);
-            return true;
-
-        } catch (error) {
-            return false;
         }
     }
 }
