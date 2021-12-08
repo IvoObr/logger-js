@@ -1,5 +1,5 @@
 {
-    "name": "@7dev-works/logger",
+    "name": "@7util/logger",
     "version": "2.2.4",
     "description": "Simple JS logger",
     "main": "index.js",
