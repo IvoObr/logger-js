@@ -2,7 +2,7 @@
 ##### Simple JS logger
 Supports Browser, NodeJS and TypeScript
 
-> $ npm install @7dev-works/logger
+> $ npm install @7util/logger
 
 ###  Features :loudspeaker:
 
@@ -18,9 +18,9 @@ Supports Browser, NodeJS and TypeScript
 
 > logger.ts 
 ```typescript
-import { Logger, ILogOptions } from '@7dev-works/logger';
+import { Logger, ILogOptions } from '@7util/logger';
 // OR 
-const { Logger } = require('@7dev-works/logger'); // no options interface available
+const { Logger } = require('@7util/logger'); // no options interface available
 
 
 /** ILogOptions
