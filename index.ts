@@ -125,12 +125,22 @@ export class Logger {
     }
 
     private getTime(): string {
-        const time: string = new Date()
-            .toISOString()
-            .replace('T', ' ')
-            .substring(0, this._magic_number);
-        return `[${time}]`;
+
+        function pad(num: number): string {
+            return String(num).padStart(2, '0');
+        }
+        
+        const date: Date = new Date();      
+        const year: number = date.getFullYear();
+        const month: string = pad(date.getMonth() + 1);
+        const day: string = pad(date.getDate());
+        const hours: string = pad(date.getHours());
+        const minutes: string = pad(date.getMinutes());
+        const seconds: string = pad(date.getSeconds());
+
+        return `[${year}-${month}-${day} ${hours}:${minutes}:${seconds}]`;
     }
+
 
     private setStack(): void {
         const error: Error = new Error;
