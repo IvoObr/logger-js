@@ -10,7 +10,6 @@ export declare class Logger {
     private readonly logInFile;
     private readonly isWindow;
     private readonly logLevel;
-    private readonly _magic_number;
     private get fileName();
     private set fileName(value);
     constructor(options?: ILogOptions);

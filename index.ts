@@ -40,7 +40,6 @@ export class Logger {
     private readonly logInFile: boolean = true;
     private readonly isWindow: boolean = false;
     private readonly logLevel: level = 'prod';
-    private readonly _magic_number: number = 19;
 
     private get fileName() {
         const date: string = new Date().toISOString().split('T')[0]
@@ -126,9 +125,8 @@ export class Logger {
 
     private getTime(): string {
 
-        function pad(num: number): string {
-            return String(num).padStart(2, '0');
-        }
+        const pad = (num: number): string =>
+            String(num).padStart(2, '0');
         
         const date: Date = new Date();      
         const year: number = date.getFullYear();
