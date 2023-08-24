@@ -94,7 +94,14 @@ export class Logger {
 
     private prepareAndSend(caller: any, color: colors, msg: any[]): void {
         const time: string = this.getTime();
-        const header: string = `${styles.reset}${styles.bold}${this.useColor ? color : ''}${time} ${caller}:${styles.reset}`;
+        let header: string; 
+
+        if (this.useColor) {
+            header = `${styles.reset}${styles.bold}${color}${time} ${caller}:${styles.reset}`;
+        } else {
+            header = `${time} ${caller}:`;
+        }
+
         msg.unshift(header);
         msg = this.stringifyObjects(msg);
 
