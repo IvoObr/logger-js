@@ -6,13 +6,14 @@ Supports Browser, NodeJS and TypeScript
 
 ###  Features :loudspeaker:
 
-* print fully arrays and objects
+* print fully arrays and objects - any depth, cycles included
 * accept multiple arguments
 * trace and error have stack
 * debug level mode
 * have timestamp
 * include TypeScript definitions
 * logs in timestamped files on the disc (NodeJS)
+* never throws on what you log, and never blocks on writing it
 
 ### Example
 
@@ -44,6 +45,13 @@ export default logger;
 
 :construction: *When using the logger in the browser make sure that all log levels (verbose, info, warnings and errors) are activated.*
 
+In the browser, `fs` is never loaded and colors are off by default; `logInFile` is
+ignored. Bundlers pick this up from the `browser` field in `package.json`.
+
+File writes are buffered and flushed on the next tick, and whatever is still
+buffered is written synchronously when the process exits. Call `logger.flush()`
+to force it yourself.
+
 > somewhere in your project...
 ```typescript
 import logger from './logger.ts'; // your logger instance
@@ -64,7 +72,7 @@ logger.success('success', obj, 'msg');
 /* output */
 [2021-04-08 13:11:40] INFO: info {"key":"value1","inner":{"secret":"value2"},"arr":[1,[]]} msg
 [2021-04-08 13:11:40] WARN: warn {"key":"value1","inner":{"secret":"value2"},"arr":[1,[]]} msg
-[2021-04-08 13:11:40] TRACE:: trace {"key":"value1","inner":{"secret":"value2"},"arr":[1,[]]} msg
+[2021-04-08 13:11:40] TRACE: trace {"key":"value1","inner":{"secret":"value2"},"arr":[1,[]]} msg
     at Object...
     at Module...
 [2021-04-08 13:11:40] ERROR: {"key":"value1","inner":{"secret":"value2"},"arr":[1,[]]} Error: msg
