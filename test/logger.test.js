@@ -387,12 +387,18 @@ describe('file output', () => {
 
             const file = path.join(dir, `${localDate()}-logger.log`);
 
-            // Polled rather than slept on, so a loaded CI runner cannot flake this.
-            for (let waited = 0; waited < 2000 && !fs.existsSync(file); waited += 20) {
-                await new Promise((resolve) => setTimeout(resolve, 20));
+            // Polls for content, not for the file: opening the append descriptor
+            // creates it before the write itself lands.
+            let contents = '';
+            for (let waited = 0; waited < 2000 && !contents; waited += 20) {
+                contents = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+
+                if (!contents) {
+                    await new Promise((resolve) => setTimeout(resolve, 20));
+                }
             }
 
-            assert.match(fs.readFileSync(file, 'utf8'), /INFO: deferred\n$/);
+            assert.match(contents, /INFO: deferred\n$/);
         });
     });
 
