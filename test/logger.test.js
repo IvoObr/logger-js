@@ -15,6 +15,7 @@ const {
 } = require('./helpers.js');
 
 const ROOT = path.resolve(__dirname, '..');
+const REPORT = '__child_report';
 
 /** Logs once with the given options and returns the captured console calls. */
 function log(method, options, ...msg) {
@@ -51,13 +52,24 @@ function logToFile(options, write) {
     });
 }
 
-/** Runs a snippet in a child process, silencing the logger's console output. */
+/**
+ * Runs a snippet in a child process and returns whatever it passed to report().
+ * The result travels through a file rather than stdout, which keeps the logger's
+ * own console output out of the way without depending on /dev/stdout.
+ */
 function inChild(body, env) {
-    return inTempDir((dir) => execFileSync(process.execPath, ['-e', `
-        const { Logger } = require(${JSON.stringify(ROOT)});
-        for (const m of ['log', 'info', 'warn', 'error', 'debug']) console[m] = () => {};
-        ${body}
-    `], { cwd: dir, env: { ...process.env, ...env }, encoding: 'utf8' }));
+    return inTempDir((dir) => {
+        execFileSync(process.execPath, ['-e', `
+            const { Logger } = require(${JSON.stringify(ROOT)});
+            const report = (text) => require('fs').writeFileSync('${REPORT}', text);
+            const logFile = () => require('fs').readdirSync('.').filter((f) => f.endsWith('.log'))[0];
+            ${body}
+        `], { cwd: dir, env: { ...process.env, ...env }, stdio: ['ignore', 'ignore', 'pipe'] });
+
+        const report = path.join(dir, REPORT);
+
+        return fs.existsSync(report) ? fs.readFileSync(report, 'utf8') : '';
+    });
 }
 
 describe('console routing', () => {
@@ -372,9 +384,15 @@ describe('file output', () => {
             }
 
             assert.deepEqual(fs.readdirSync(dir), [], 'the write should be batched, not immediate');
-            await new Promise((resolve) => setTimeout(resolve, 50));
 
-            assert.match(fs.readFileSync(path.join(dir, `${localDate()}-logger.log`), 'utf8'), /INFO: deferred\n$/);
+            const file = path.join(dir, `${localDate()}-logger.log`);
+
+            // Polled rather than slept on, so a loaded CI runner cannot flake this.
+            for (let waited = 0; waited < 2000 && !fs.existsSync(file); waited += 20) {
+                await new Promise((resolve) => setTimeout(resolve, 20));
+            }
+
+            assert.match(fs.readFileSync(file, 'utf8'), /INFO: deferred\n$/);
         });
     });
 
@@ -396,8 +414,8 @@ describe('file output', () => {
             new Logger({ useColor: false }).info('on exit');
             const fs = require('fs');
             process.on('exit', () => {
-                const file = fs.readdirSync('.')[0];
-                fs.writeFileSync('/dev/stdout', file + '|' + fs.readFileSync(file, 'utf8'));
+                const file = logFile();
+                report(file + '|' + fs.readFileSync(file, 'utf8'));
             });
         `);
 
@@ -499,7 +517,7 @@ describe('options', () => {
             const logger = new Logger({ logLevel: process.env.LOG_LEVEL, useColor: false });
             logger.debug('from env');
             logger.flush();
-            fs.writeFileSync('/dev/stdout', fs.readFileSync(fs.readdirSync('.')[0], 'utf8'));
+            report(fs.readFileSync(logFile(), 'utf8'));
         `, { LOG_LEVEL: 'debug' });
 
         assert.match(output, /DEBUG: from env/);
