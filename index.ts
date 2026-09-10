@@ -1,21 +1,3 @@
-const ESC: string = String.fromCharCode(27);
-
-const colors = {
-    red: `${ESC}[31m`,
-    green: `${ESC}[32m`,
-    yellow: `${ESC}[33m`,
-    blue: `${ESC}[34m`,
-    white: `${ESC}[37m`,
-    cyan: `${ESC}[36m`
-};
-
-const styles = {
-    reset: `${ESC}[0m`,
-    bold: `${ESC}[1m`
-};
-
-const ANSI: RegExp = new RegExp(`${ESC}\\[[0-9;]*m`, 'g');
-
 type ConsoleMethod = 'log' | 'info' | 'warn' | 'error' | 'debug';
 
 interface ILevel {
@@ -27,15 +9,6 @@ interface ILevel {
     /** Only emitted when logLevel is 'debug'. */
     gated?: boolean;
 }
-
-const levels: { [name: string]: ILevel } = {
-    info: { label: 'INFO', color: colors.white, method: 'info' },
-    warn: { label: 'WARN', color: colors.yellow, method: 'warn' },
-    error: { label: 'ERROR', color: colors.red, method: 'error' },
-    trace: { label: 'TRACE', color: colors.blue, method: 'log', stack: true },
-    debug: { label: 'DEBUG', color: colors.cyan, method: 'debug', gated: true },
-    success: { label: 'SUCCESS', color: colors.green, method: 'log' }
-};
 
 export type LogLevel = 'debug' | 'prod';
 
@@ -52,185 +25,227 @@ interface INodeModules {
     path: typeof import('path');
 }
 
-const isNode = (): boolean =>
-    typeof process !== 'undefined' && !!process.versions && !!process.versions.node;
-
-let nodeModules: INodeModules | null | undefined;
-
 /**
- * Loaded on first use rather than imported, so a browser bundle never has to
- * resolve 'fs'. package.json also maps 'fs' and 'path' to false for bundlers.
+ * Everything Logger needs but does not expose. Members are static rather than
+ * per-instance because the state here - the module cache and the buffering
+ * registry - is process-wide by design, shared by every Logger.
+ *
+ * Methods never read 'this': Helper.formatArg is passed unbound to Array.map,
+ * so every internal reference is qualified with Helper instead.
  */
-function loadNodeModules(): INodeModules | null {
-    if (nodeModules === undefined) {
-        nodeModules = null;
-        try {
-            const fs = require('fs');
-            const path = require('path');
+class Helper {
 
-            if (typeof fs.openSync === 'function' && typeof path.join === 'function') {
-                nodeModules = { fs: fs, path: path };
-            }
-        } catch (error) {
-            nodeModules = null;
-        }
+    private static readonly ESC: string = String.fromCharCode(27);
+
+    private static readonly colors = {
+        red: `${Helper.ESC}[31m`,
+        green: `${Helper.ESC}[32m`,
+        yellow: `${Helper.ESC}[33m`,
+        blue: `${Helper.ESC}[34m`,
+        white: `${Helper.ESC}[37m`,
+        cyan: `${Helper.ESC}[36m`
+    };
+
+    public static readonly styles = {
+        reset: `${Helper.ESC}[0m`,
+        bold: `${Helper.ESC}[1m`
+    };
+
+    public static readonly ANSI: RegExp = new RegExp(`${Helper.ESC}\\[[0-9;]*m`, 'g');
+
+    public static readonly levels: { [name: string]: ILevel } = {
+        info: { label: 'INFO', color: Helper.colors.white, method: 'info' },
+        warn: { label: 'WARN', color: Helper.colors.yellow, method: 'warn' },
+        error: { label: 'ERROR', color: Helper.colors.red, method: 'error' },
+        trace: { label: 'TRACE', color: Helper.colors.blue, method: 'log', stack: true },
+        debug: { label: 'DEBUG', color: Helper.colors.cyan, method: 'debug', gated: true },
+        success: { label: 'SUCCESS', color: Helper.colors.green, method: 'log' }
+    };
+
+    private static nodeModules: INodeModules | null | undefined;
+
+    private static readonly buffering: Logger[] = [];
+
+    private static exitHookInstalled: boolean = false;
+
+    public static isNode(): boolean {
+        return typeof process !== 'undefined' && !!process.versions && !!process.versions.node;
     }
 
-    return nodeModules;
-}
-
-const pad = (num: number): string => String(num).padStart(2, '0');
-
-/** Local calendar date, so file names line up with the timestamps inside them. */
-function localDate(date: Date): string {
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-function localTime(date: Date): string {
-    return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-}
-
-function className(value: object): string {
-    const proto: any = Object.getPrototypeOf(value);
-
-    if (!proto || proto === Object.prototype) {
-        return '';
-    }
-
-    const name: string = proto.constructor && proto.constructor.name;
-
-    return name && name !== 'Object' ? `${name} ` : '';
-}
-
-/**
- * Serializes a value in full, whatever it is: no depth limit, cycles become
- * "[Circular]", and BigInt, symbols, functions and Errors all survive.
- */
-function stringify(value: any, seen: any[]): string {
-    if (value === null) {
-        return 'null';
-    }
-
-    switch (typeof value) {
-        case 'string': return JSON.stringify(value);
-        case 'number': return Object.is(value, -0) ? '-0' : String(value);
-        case 'boolean': return String(value);
-        case 'undefined': return 'undefined';
-        case 'bigint': return `${value}n`;
-        case 'symbol': return value.toString();
-        case 'function': return `[Function: ${value.name || 'anonymous'}]`;
-    }
-
-    if (seen.indexOf(value) !== -1) {
-        return '"[Circular]"';
-    }
-
-    seen.push(value);
-    try {
-        if (value instanceof Error) {
-            return JSON.stringify(value.stack || `${value.name}: ${value.message}`);
-        }
-        if (value instanceof Date) {
-            return JSON.stringify(isNaN(value.getTime()) ? 'Invalid Date' : value.toISOString());
-        }
-        if (value instanceof RegExp) {
-            return JSON.stringify(String(value));
-        }
-        if (Array.isArray(value)) {
-            return `[${value.map((item: any): string => stringify(item, seen)).join(',')}]`;
-        }
-        if (value instanceof Map) {
-            const entries: string[] = [];
-            value.forEach((val: any, key: any): void => {
-                entries.push(`${stringify(key, seen)}:${stringify(val, seen)}`);
-            });
-            return `Map(${value.size}) {${entries.join(',')}}`;
-        }
-        if (value instanceof Set) {
-            const items: string[] = [];
-            value.forEach((item: any): void => {
-                items.push(stringify(item, seen));
-            });
-            return `Set(${value.size}) [${items.join(',')}]`;
-        }
-
-        const props: string[] = Object.keys(value).map((key: string): string => {
-            let serialized: string;
+    /**
+     * Loaded on first use rather than imported, so a browser bundle never has to
+     * resolve 'fs'. package.json also maps 'fs' and 'path' to false for bundlers.
+     */
+    public static loadNodeModules(): INodeModules | null {
+        if (Helper.nodeModules === undefined) {
+            Helper.nodeModules = null;
             try {
-                serialized = stringify(value[key], seen);
+                const fs = require('fs');
+                const path = require('path');
+
+                if (typeof fs.openSync === 'function' && typeof path.join === 'function') {
+                    Helper.nodeModules = { fs: fs, path: path };
+                }
             } catch (error) {
-                serialized = '"[Throws]"';
+                Helper.nodeModules = null;
             }
-            return `${JSON.stringify(key)}:${serialized}`;
+        }
+
+        return Helper.nodeModules;
+    }
+
+    private static pad(num: number): string {
+        return String(num).padStart(2, '0');
+    }
+
+    /** Local calendar date, so file names line up with the timestamps inside them. */
+    public static localDate(date: Date): string {
+        return `${date.getFullYear()}-${Helper.pad(date.getMonth() + 1)}-${Helper.pad(date.getDate())}`;
+    }
+
+    public static localTime(date: Date): string {
+        return `${Helper.pad(date.getHours())}:${Helper.pad(date.getMinutes())}:${Helper.pad(date.getSeconds())}`;
+    }
+
+    private static className(value: object): string {
+        const proto: any = Object.getPrototypeOf(value);
+
+        if (!proto || proto === Object.prototype) {
+            return '';
+        }
+
+        const name: string = proto.constructor && proto.constructor.name;
+
+        return name && name !== 'Object' ? `${name} ` : '';
+    }
+
+    /**
+     * Serializes a value in full, whatever it is: no depth limit, cycles become
+     * "[Circular]", and BigInt, symbols, functions and Errors all survive.
+     */
+    private static stringify(value: any, seen: any[]): string {
+        if (value === null) {
+            return 'null';
+        }
+
+        switch (typeof value) {
+            case 'string': return JSON.stringify(value);
+            case 'number': return Object.is(value, -0) ? '-0' : String(value);
+            case 'boolean': return String(value);
+            case 'undefined': return 'undefined';
+            case 'bigint': return `${value}n`;
+            case 'symbol': return value.toString();
+            case 'function': return `[Function: ${value.name || 'anonymous'}]`;
+        }
+
+        if (seen.indexOf(value) !== -1) {
+            return '"[Circular]"';
+        }
+
+        seen.push(value);
+        try {
+            if (value instanceof Error) {
+                return JSON.stringify(value.stack || `${value.name}: ${value.message}`);
+            }
+            if (value instanceof Date) {
+                return JSON.stringify(isNaN(value.getTime()) ? 'Invalid Date' : value.toISOString());
+            }
+            if (value instanceof RegExp) {
+                return JSON.stringify(String(value));
+            }
+            if (Array.isArray(value)) {
+                return `[${value.map((item: any): string => Helper.stringify(item, seen)).join(',')}]`;
+            }
+            if (value instanceof Map) {
+                const entries: string[] = [];
+                value.forEach((val: any, key: any): void => {
+                    entries.push(`${Helper.stringify(key, seen)}:${Helper.stringify(val, seen)}`);
+                });
+                return `Map(${value.size}) {${entries.join(',')}}`;
+            }
+            if (value instanceof Set) {
+                const items: string[] = [];
+                value.forEach((item: any): void => {
+                    items.push(Helper.stringify(item, seen));
+                });
+                return `Set(${value.size}) [${items.join(',')}]`;
+            }
+
+            const props: string[] = Object.keys(value).map((key: string): string => {
+                let serialized: string;
+                try {
+                    serialized = Helper.stringify(value[key], seen);
+                } catch (error) {
+                    serialized = '"[Throws]"';
+                }
+                return `${JSON.stringify(key)}:${serialized}`;
+            });
+
+            return `${Helper.className(value)}{${props.join(',')}}`;
+
+        } finally {
+            seen.pop();
+        }
+    }
+
+    /** Top-level arguments: strings and Errors print bare, everything else serialized. */
+    public static formatArg(value: any): string {
+        try {
+            if (typeof value === 'string') {
+                return value;
+            }
+            if (value instanceof Error) {
+                return value.stack || `${value.name}: ${value.message}`;
+            }
+            return Helper.stringify(value, []);
+
+        } catch (error) {
+            return '[Unserializable]';
+        }
+    }
+
+    /**
+     * The caller's stack, without the frames inside this module. Error.captureStackTrace
+     * is V8-only, so other engines keep the few extra frames rather than crash.
+     */
+    public static captureFrames(boundary: Function): string {
+        const error: Error = new Error();
+
+        if (typeof (Error as any).captureStackTrace === 'function') {
+            (Error as any).captureStackTrace(error, boundary);
+        }
+
+        const stack: string = error.stack || '';
+        const lines: string[] = stack.split('\n').filter((line: string): boolean => /^\s+at\s/.test(line));
+
+        return lines.length > 0 ? lines.join('\n') : stack.split('\n').slice(1).join('\n');
+    }
+
+    /**
+     * One process-wide 'exit' listener drains every logger that still has buffered
+     * lines, rather than one listener per instance.
+     */
+    public static trackBuffering(logger: Logger): void {
+        if (Helper.buffering.indexOf(logger) === -1) {
+            Helper.buffering.push(logger);
+        }
+
+        if (Helper.exitHookInstalled || typeof process === 'undefined' || typeof process.once !== 'function') {
+            return;
+        }
+
+        Helper.exitHookInstalled = true;
+        process.once('exit', (): void => {
+            Helper.buffering.slice().forEach((pending: Logger): void => pending.flush());
         });
-
-        return `${className(value)}{${props.join(',')}}`;
-
-    } finally {
-        seen.pop();
     }
-}
 
-/** Top-level arguments: strings and Errors print bare, everything else serialized. */
-function formatArg(value: any): string {
-    try {
-        if (typeof value === 'string') {
-            return value;
+    public static untrackBuffering(logger: Logger): void {
+        const index: number = Helper.buffering.indexOf(logger);
+
+        if (index !== -1) {
+            Helper.buffering.splice(index, 1);
         }
-        if (value instanceof Error) {
-            return value.stack || `${value.name}: ${value.message}`;
-        }
-        return stringify(value, []);
-
-    } catch (error) {
-        return '[Unserializable]';
-    }
-}
-
-/**
- * The caller's stack, without the frames inside this module. Error.captureStackTrace
- * is V8-only, so other engines keep the few extra frames rather than crash.
- */
-function captureFrames(boundary: Function): string {
-    const error: Error = new Error();
-
-    if (typeof (Error as any).captureStackTrace === 'function') {
-        (Error as any).captureStackTrace(error, boundary);
-    }
-
-    const stack: string = error.stack || '';
-    const lines: string[] = stack.split('\n').filter((line: string): boolean => /^\s+at\s/.test(line));
-
-    return lines.length > 0 ? lines.join('\n') : stack.split('\n').slice(1).join('\n');
-}
-
-const buffering: Logger[] = [];
-let exitHookInstalled: boolean = false;
-
-/**
- * One process-wide 'exit' listener drains every logger that still has buffered
- * lines, rather than one listener per instance.
- */
-function trackBuffering(logger: Logger): void {
-    if (buffering.indexOf(logger) === -1) {
-        buffering.push(logger);
-    }
-
-    if (exitHookInstalled || typeof process === 'undefined' || typeof process.once !== 'function') {
-        return;
-    }
-
-    exitHookInstalled = true;
-    process.once('exit', (): void => {
-        buffering.slice().forEach((pending: Logger): void => pending.flush());
-    });
-}
-
-function untrackBuffering(logger: Logger): void {
-    const index: number = buffering.indexOf(logger);
-
-    if (index !== -1) {
-        buffering.splice(index, 1);
     }
 }
 
@@ -250,7 +265,7 @@ export class Logger {
     private writeErrorReported: boolean = false;
 
     constructor(options?: ILogOptions) {
-        const node: boolean = isNode();
+        const node: boolean = Helper.isNode();
 
         this.canWriteFiles = node;
         this.useColor = typeof options?.useColor === 'boolean' ? options.useColor : node;
@@ -262,27 +277,27 @@ export class Logger {
     }
 
     public info(...msg: any[]): void {
-        this.emit(levels.info, msg);
+        this.emit(Helper.levels.info, msg);
     }
 
     public warn(...msg: any[]): void {
-        this.emit(levels.warn, msg);
+        this.emit(Helper.levels.warn, msg);
     }
 
     public trace(...msg: any[]): void {
-        this.emit(levels.trace, msg, this.trace);
+        this.emit(Helper.levels.trace, msg, this.trace);
     }
 
     public error(...msg: any[]): void {
-        this.emit(levels.error, msg);
+        this.emit(Helper.levels.error, msg);
     }
 
     public debug(...msg: any[]): void {
-        this.emit(levels.debug, msg);
+        this.emit(Helper.levels.debug, msg);
     }
 
     public success(...msg: any[]): void {
-        this.emit(levels.success, msg);
+        this.emit(Helper.levels.success, msg);
     }
 
     /** Writes any buffered lines to disk immediately. */
@@ -295,11 +310,11 @@ export class Logger {
             return;
         }
 
-        const body: string = msg.map(formatArg).join(' ');
+        const body: string = msg.map(Helper.formatArg).join(' ');
         let line: string = body ? `${this.header(level)} ${body}` : this.header(level);
 
         if (level.stack) {
-            const frames: string = captureFrames(boundary || this.emit);
+            const frames: string = Helper.captureFrames(boundary || this.emit);
             if (frames) {
                 line += `\n${frames}`;
             }
@@ -311,10 +326,10 @@ export class Logger {
 
     private header(level: ILevel): string {
         const date: Date = new Date();
-        const time: string = `[${localDate(date)} ${localTime(date)}]`;
+        const time: string = `[${Helper.localDate(date)} ${Helper.localTime(date)}]`;
 
         return this.useColor
-            ? `${styles.reset}${styles.bold}${level.color}${time} ${level.label}:${styles.reset}`
+            ? `${Helper.styles.reset}${Helper.styles.bold}${level.color}${time} ${level.label}:${Helper.styles.reset}`
             : `${time} ${level.label}:`;
     }
 
@@ -323,7 +338,7 @@ export class Logger {
             return;
         }
 
-        this.queue.push(`${line.replace(ANSI, '')}\n`);
+        this.queue.push(`${line.replace(Helper.ANSI, '')}\n`);
         this.scheduleDrain();
     }
 
@@ -337,7 +352,7 @@ export class Logger {
             return;
         }
 
-        trackBuffering(this);
+        Helper.trackBuffering(this);
         this.flushTimer = setTimeout((): void => {
             this.flushTimer = undefined;
             this.drain(false);
@@ -349,7 +364,7 @@ export class Logger {
     }
 
     private drain(sync: boolean): void {
-        const modules: INodeModules | null = loadNodeModules();
+        const modules: INodeModules | null = Helper.loadNodeModules();
 
         if (!modules || this.queue.length === 0 || (this.writing && !sync)) {
             return;
@@ -391,7 +406,7 @@ export class Logger {
 
     private settle(): void {
         if (this.queue.length === 0 && !this.writing && this.flushTimer === undefined) {
-            untrackBuffering(this);
+            Helper.untrackBuffering(this);
         }
     }
 
@@ -429,7 +444,7 @@ export class Logger {
 
     /** Date-stamps the file name, leaving any directory in fileName intact. */
     private filePath(modules: INodeModules): string {
-        const stamp: string = localDate(new Date());
+        const stamp: string = Helper.localDate(new Date());
         const dir: string = modules.path.dirname(this.baseFileName);
         const base: string = modules.path.basename(this.baseFileName);
 
@@ -445,6 +460,6 @@ export class Logger {
         this.writeErrorReported = true;
         const reason: string = error instanceof Error ? error.message : String(error);
 
-        console.error(`${this.header(levels.error)} logger cannot write to ${this.fdPath || this.baseFileName}: ${reason}`);
+        console.error(`${this.header(Helper.levels.error)} logger cannot write to ${this.fdPath || this.baseFileName}: ${reason}`);
     }
 }
