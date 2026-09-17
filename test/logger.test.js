@@ -1,27 +1,30 @@
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const { execFileSync } = require('node:child_process');
-const fs = require('node:fs');
-const path = require('node:path');
+import { describe, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const { Logger } = require('..');
-const {
+import { Logger } from '../index.ts';
+import {
     captureConsole,
     inTempDir,
     localDate,
     stripAnsi,
     hasAnsi,
-    TIMESTAMP
-} = require('./helpers.js');
+    TIMESTAMP,
+} from './helpers.js';
 
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(fileURLToPath(import.meta.url), '../..');
 const REPORT = '__child_report';
 
 /** Logs once with the given options and returns the captured console calls. */
 function log(method, options, ...msg) {
     const capture = captureConsole();
     try {
-        new Logger({ logInFile: false, useColor: false, ...options })[method](...msg);
+        new Logger({ logInFile: false, useColor: false, ...options })[method](
+            ...msg
+        );
         return capture.calls;
     } finally {
         capture.restore();
@@ -44,9 +47,10 @@ function logToFile(options, write) {
         }
 
         const files = fs.readdirSync(dir);
-        const contents = files.length === 1
-            ? fs.readFileSync(path.join(dir, files[0]), 'utf8')
-            : '';
+        const contents =
+            files.length === 1
+                ? fs.readFileSync(path.join(dir, files[0]), 'utf8')
+                : '';
 
         return { dir, files, contents };
     });
@@ -59,12 +63,23 @@ function logToFile(options, write) {
  */
 function inChild(body, env) {
     return inTempDir((dir) => {
-        execFileSync(process.execPath, ['-e', `
+        execFileSync(
+            process.execPath,
+            [
+                '-e',
+                `
             const { Logger } = require(${JSON.stringify(ROOT)});
             const report = (text) => require('fs').writeFileSync('${REPORT}', text);
             const logFile = () => require('fs').readdirSync('.').filter((f) => f.endsWith('.log'))[0];
             ${body}
-        `], { cwd: dir, env: { ...process.env, ...env }, stdio: ['ignore', 'ignore', 'pipe'] });
+        `,
+            ],
+            {
+                cwd: dir,
+                env: { ...process.env, ...env },
+                stdio: ['ignore', 'ignore', 'pipe'],
+            }
+        );
 
         const report = path.join(dir, REPORT);
 
@@ -78,7 +93,7 @@ describe('console routing', () => {
         ['warn', 'warn'],
         ['error', 'error'],
         ['success', 'log'],
-        ['trace', 'log']
+        ['trace', 'log'],
     ];
 
     for (const [level, consoleMethod] of cases) {
@@ -99,14 +114,21 @@ describe('console routing', () => {
 
     it('emits exactly one console call per log', () => {
         for (const level of ['info', 'warn', 'error', 'success', 'trace']) {
-            assert.equal(log(level, {}, 'x').length, 1, `${level} did not log once`);
+            assert.equal(
+                log(level, {}, 'x').length,
+                1,
+                `${level} did not log once`
+            );
         }
     });
 });
 
 describe('header', () => {
     it('starts with a timestamp followed by the level', () => {
-        assert.match(line('info', 'hello'), /^\[[\d-]{10} [\d:]{8}\] INFO: hello$/);
+        assert.match(
+            line('info', 'hello'),
+            /^\[[\d-]{10} [\d:]{8}\] INFO: hello$/
+        );
     });
 
     it('stamps the local date and time', () => {
@@ -114,7 +136,10 @@ describe('header', () => {
     });
 
     it('pads the timestamp to a fixed width', () => {
-        assert.match(line('info', 'x').split(' ').slice(0, 2).join(' '), TIMESTAMP);
+        assert.match(
+            line('info', 'x').split(' ').slice(0, 2).join(' '),
+            TIMESTAMP
+        );
     });
 
     it('names each level in the header', () => {
@@ -123,7 +148,7 @@ describe('header', () => {
             warn: 'WARN',
             error: 'ERROR',
             success: 'SUCCESS',
-            trace: 'TRACE'
+            trace: 'TRACE',
         })) {
             assert.match(line(level, 'x'), new RegExp(`\\] ${label}: x`));
         }
@@ -131,12 +156,17 @@ describe('header', () => {
 
     it('separates the level from the message with a single colon', () => {
         for (const level of ['info', 'warn', 'error', 'success', 'trace']) {
-            assert.ok(!/::/.test(line(level, 'x')), `${level} doubled the colon`);
+            assert.ok(
+                !/::/.test(line(level, 'x')),
+                `${level} doubled the colon`
+            );
         }
     });
 
     it('colors the header by default in node', () => {
-        assert.ok(hasAnsi(log('info', { useColor: undefined }, 'x')[0].args[0]));
+        assert.ok(
+            hasAnsi(log('info', { useColor: undefined }, 'x')[0].args[0])
+        );
     });
 
     it('omits color when useColor is false', () => {
@@ -145,7 +175,11 @@ describe('header', () => {
 
     it('uses a distinct color per level', () => {
         const prefix = (level) =>
-            log(level, { useColor: true, logLevel: 'debug' }, 'x')[0].args[0].replace(/\[[\d-]{10}.*/s, '');
+            log(
+                level,
+                { useColor: true, logLevel: 'debug' },
+                'x'
+            )[0].args[0].replace(/\[[\d-]{10}.*/s, '');
         const names = ['info', 'warn', 'error', 'success', 'debug'];
 
         assert.equal(new Set(names.map(prefix)).size, names.length);
@@ -158,7 +192,10 @@ describe('formatting', () => {
     });
 
     it('prints strings bare and primitives verbatim', () => {
-        assert.match(line('info', 'n:', 1, true, null, undefined), /INFO: n: 1 true null undefined$/);
+        assert.match(
+            line('info', 'n:', 1, true, null, undefined),
+            /INFO: n: 1 true null undefined$/
+        );
     });
 
     it('serializes plain objects as JSON', () => {
@@ -169,11 +206,17 @@ describe('formatting', () => {
     });
 
     it('prints arrays at full depth', () => {
-        assert.match(line('info', [[[[['deep']]]]]), /INFO: \[\[\[\[\["deep"\]\]\]\]\]$/);
+        assert.match(
+            line('info', [[[[['deep']]]]]),
+            /INFO: \[\[\[\[\["deep"\]\]\]\]\]$/
+        );
     });
 
     it('prints deeply nested objects at full depth', () => {
-        assert.match(line('info', { a: { b: { c: { d: { e: 1 } } } } }), /\{"a":\{"b":\{"c":\{"d":\{"e":1\}\}\}\}\}$/);
+        assert.match(
+            line('info', { a: { b: { c: { d: { e: 1 } } } } }),
+            /\{"a":\{"b":\{"c":\{"d":\{"e":1\}\}\}\}\}$/
+        );
     });
 
     it('names the class of a non-plain object', () => {
@@ -187,7 +230,10 @@ describe('formatting', () => {
     });
 
     it('serializes Maps and Sets', () => {
-        assert.match(line('info', new Map([['a', 1]])), /INFO: Map\(1\) \{"a":1\}$/);
+        assert.match(
+            line('info', new Map([['a', 1]])),
+            /INFO: Map\(1\) \{"a":1\}$/
+        );
         assert.match(line('info', new Set([1, 2])), /INFO: Set\(2\) \[1,2\]$/);
     });
 
@@ -199,7 +245,10 @@ describe('formatting', () => {
         const circular = { a: 1 };
         circular.self = circular;
 
-        assert.match(line('info', circular), /INFO: \{"a":1,"self":"\[Circular\]"\}$/);
+        assert.match(
+            line('info', circular),
+            /INFO: \{"a":1,"self":"\[Circular\]"\}$/
+        );
     });
 
     it('handles a cycle through an array', () => {
@@ -212,7 +261,10 @@ describe('formatting', () => {
     it('prints the same object twice without calling it circular', () => {
         const shared = { n: 1 };
 
-        assert.match(line('info', { a: shared, b: shared }), /\{"a":\{"n":1\},"b":\{"n":1\}\}$/);
+        assert.match(
+            line('info', { a: shared, b: shared }),
+            /\{"a":\{"n":1\},"b":\{"n":1\}\}$/
+        );
     });
 
     it('survives a getter that throws', () => {
@@ -220,7 +272,7 @@ describe('formatting', () => {
             get boom() {
                 throw new Error('nope');
             },
-            ok: 1
+            ok: 1,
         };
 
         assert.match(line('info', hostile), /"boom":"\[Throws\]","ok":1/);
@@ -233,12 +285,25 @@ describe('formatting', () => {
     });
 
     it('serializes symbols, functions and dates', () => {
-        assert.match(line('info', { s: Symbol('x'), f: function named() {}, d: new Date(0) }),
-            /\{"s":Symbol\(x\),"f":\[Function: named\],"d":"1970-01-01T00:00:00\.000Z"\}$/);
+        assert.match(
+            line('info', {
+                s: Symbol('x'),
+                f: function named() {},
+                d: new Date(0),
+            }),
+            /\{"s":Symbol\(x\),"f":\[Function: named\],"d":"1970-01-01T00:00:00\.000Z"\}$/
+        );
     });
 
     it('never throws on an exotic value', () => {
-        const proxy = new Proxy({}, { ownKeys() { throw new Error('nope'); } });
+        const proxy = new Proxy(
+            {},
+            {
+                ownKeys() {
+                    throw new Error('nope');
+                },
+            }
+        );
 
         assert.doesNotThrow(() => log('info', {}, proxy));
         assert.match(line('info', proxy), /INFO: \[Unserializable\]$/);
@@ -256,7 +321,10 @@ describe('trace', () => {
         const frames = line('trace', 'x').split('\n').slice(1);
 
         assert.ok(frames.length > 0);
-        assert.ok(!/index\.js/.test(frames[0]), `stack leaked a logger frame: ${frames[0]}`);
+        assert.ok(
+            !/index\.js/.test(frames[0]),
+            `stack leaked a logger frame: ${frames[0]}`
+        );
     });
 
     it('still traces when captureStackTrace is missing', () => {
@@ -285,7 +353,11 @@ describe('log level', () => {
 
     it('still emits the other levels at the default level', () => {
         for (const level of ['info', 'warn', 'error', 'success', 'trace']) {
-            assert.equal(log(level, {}, 'x').length, 1, `${level} was suppressed`);
+            assert.equal(
+                log(level, {}, 'x').length,
+                1,
+                `${level} was suppressed`
+            );
         }
     });
 });
@@ -304,7 +376,9 @@ describe('file output', () => {
     });
 
     it('honours a custom fileName', () => {
-        const { files } = logToFile({ fileName: 'rest-server.log' }, (logger) => logger.info('x'));
+        const { files } = logToFile({ fileName: 'rest-server.log' }, (logger) =>
+            logger.info('x')
+        );
 
         assert.deepEqual(files, [`${localDate()}-rest-server.log`]);
     });
@@ -313,7 +387,10 @@ describe('file output', () => {
         inTempDir((dir) => {
             const capture = captureConsole();
             try {
-                const logger = new Logger({ fileName: 'logs/app.log', useColor: false });
+                const logger = new Logger({
+                    fileName: 'logs/app.log',
+                    useColor: false,
+                });
                 logger.info('x');
                 logger.flush();
             } finally {
@@ -321,7 +398,9 @@ describe('file output', () => {
             }
 
             assert.deepEqual(fs.readdirSync(dir), ['logs']);
-            assert.deepEqual(fs.readdirSync(path.join(dir, 'logs')), [`${localDate()}-app.log`]);
+            assert.deepEqual(fs.readdirSync(path.join(dir, 'logs')), [
+                `${localDate()}-app.log`,
+            ]);
         });
     });
 
@@ -329,7 +408,10 @@ describe('file output', () => {
         inTempDir((dir) => {
             const capture = captureConsole();
             try {
-                const logger = new Logger({ fileName: 'deep/nested/app.log', useColor: false });
+                const logger = new Logger({
+                    fileName: 'deep/nested/app.log',
+                    useColor: false,
+                });
                 logger.info('x');
                 logger.flush();
             } finally {
@@ -337,7 +419,10 @@ describe('file output', () => {
             }
 
             assert.match(
-                fs.readFileSync(path.join(dir, 'deep/nested', `${localDate()}-app.log`), 'utf8'),
+                fs.readFileSync(
+                    path.join(dir, 'deep/nested', `${localDate()}-app.log`),
+                    'utf8'
+                ),
                 /INFO: x\n$/
             );
         });
@@ -356,7 +441,9 @@ describe('file output', () => {
     });
 
     it('strips color codes from the file', () => {
-        const { contents } = logToFile({ useColor: true }, (logger) => logger.info('colored'));
+        const { contents } = logToFile({ useColor: true }, (logger) =>
+            logger.info('colored')
+        );
 
         assert.ok(!hasAnsi(contents), 'file still contains escape codes');
         assert.equal(stripAnsi(contents), contents);
@@ -369,7 +456,9 @@ describe('file output', () => {
     });
 
     it('writes nothing when logInFile is false', () => {
-        const { files } = logToFile({ logInFile: false }, (logger) => logger.info('x'));
+        const { files } = logToFile({ logInFile: false }, (logger) =>
+            logger.info('x')
+        );
 
         assert.deepEqual(files, []);
     });
@@ -383,7 +472,11 @@ describe('file output', () => {
                 capture.restore();
             }
 
-            assert.deepEqual(fs.readdirSync(dir), [], 'the write should be batched, not immediate');
+            assert.deepEqual(
+                fs.readdirSync(dir),
+                [],
+                'the write should be batched, not immediate'
+            );
 
             const file = path.join(dir, `${localDate()}-logger.log`);
 
@@ -391,7 +484,9 @@ describe('file output', () => {
             // creates it before the write itself lands.
             let contents = '';
             for (let waited = 0; waited < 2000 && !contents; waited += 20) {
-                contents = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+                contents = fs.existsSync(file)
+                    ? fs.readFileSync(file, 'utf8')
+                    : '';
 
                 if (!contents) {
                     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -434,7 +529,10 @@ describe('file output', () => {
             fs.writeFileSync(path.join(dir, 'blocked'), '');
             const capture = captureConsole();
             try {
-                const logger = new Logger({ fileName: 'blocked/app.log', useColor: false });
+                const logger = new Logger({
+                    fileName: 'blocked/app.log',
+                    useColor: false,
+                });
                 for (let i = 0; i < 3; i++) {
                     logger.info(`x${i}`);
                     logger.flush();
@@ -443,9 +541,15 @@ describe('file output', () => {
                 capture.restore();
             }
 
-            const errors = capture.calls.filter((call) => call.method === 'error');
+            const errors = capture.calls.filter(
+                (call) => call.method === 'error'
+            );
 
-            assert.equal(errors.length, 1, `expected one error, got ${errors.length}`);
+            assert.equal(
+                errors.length,
+                1,
+                `expected one error, got ${errors.length}`
+            );
             assert.match(errors[0].args[0], /logger cannot write to/);
         });
     });
@@ -473,7 +577,10 @@ describe('environment', () => {
             }
 
             assert.deepEqual(fs.readdirSync(dir), []);
-            assert.ok(!hasAnsi(output), 'escape codes are noise in a browser console');
+            assert.ok(
+                !hasAnsi(output),
+                'escape codes are noise in a browser console'
+            );
             assert.match(output, /INFO: in a browser$/);
         });
     });
@@ -482,11 +589,16 @@ describe('environment', () => {
         const source = fs.readFileSync(path.join(ROOT, 'index.js'), 'utf8');
         const topLevel = source.slice(0, source.indexOf('class Logger'));
 
-        assert.ok(!/^const .*require\(["'](fs|path)["']\)/m.test(topLevel), 'fs/path required at module scope');
+        assert.ok(
+            !/^const .*require\(["'](fs|path)["']\)/m.test(topLevel),
+            'fs/path required at module scope'
+        );
     });
 
     it('maps fs and path away for browser bundlers', () => {
-        const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+        const pkg = JSON.parse(
+            fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')
+        );
 
         assert.deepEqual(pkg.browser, { fs: false, path: false });
     });
@@ -505,26 +617,38 @@ describe('options', () => {
     });
 
     it('ignores options of the wrong type', () => {
-        const calls = log('info', { useColor: 'yes', logInFile: 'no', fileName: 42 }, 'x');
+        const calls = log(
+            'info',
+            { useColor: 'yes', logInFile: 'no', fileName: 42 },
+            'x'
+        );
 
         assert.equal(calls.length, 1);
-        assert.ok(hasAnsi(calls[0].args[0]), 'a non-boolean useColor should not disable color');
+        assert.ok(
+            hasAnsi(calls[0].args[0]),
+            'a non-boolean useColor should not disable color'
+        );
     });
 
     it('falls back to logger.log for a blank fileName', () => {
-        const { files } = logToFile({ fileName: '   ' }, (logger) => logger.info('x'));
+        const { files } = logToFile({ fileName: '   ' }, (logger) =>
+            logger.info('x')
+        );
 
         assert.deepEqual(files, [`${localDate()}-logger.log`]);
     });
 
     it('accepts a logLevel read from the environment', () => {
-        const output = inChild(`
+        const output = inChild(
+            `
             const fs = require('fs');
             const logger = new Logger({ logLevel: process.env.LOG_LEVEL, useColor: false });
             logger.debug('from env');
             logger.flush();
             report(fs.readFileSync(logFile(), 'utf8'));
-        `, { LOG_LEVEL: 'debug' });
+        `,
+            { LOG_LEVEL: 'debug' }
+        );
 
         assert.match(output, /DEBUG: from env/);
     });

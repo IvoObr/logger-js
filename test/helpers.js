@@ -1,6 +1,6 @@
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 const ESC = String.fromCharCode(27);
 
@@ -24,7 +24,7 @@ function captureConsole() {
             for (const method of methods) {
                 console[method] = original[method];
             }
-        }
+        },
     };
 }
 
@@ -81,4 +81,12 @@ const hasAnsi = (msg) => ansiPattern().test(msg);
 
 const TIMESTAMP = /^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]$/;
 
-module.exports = { ESC, captureConsole, inTempDir, localDate, stripAnsi, hasAnsi, TIMESTAMP };
+export {
+    ESC,
+    captureConsole,
+    inTempDir,
+    localDate,
+    stripAnsi,
+    hasAnsi,
+    TIMESTAMP,
+};
