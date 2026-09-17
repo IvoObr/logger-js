@@ -15,6 +15,9 @@ export type LogLevel = 'debug' | 'prod';
 /** Line format: the human-readable line, or one JSON object per line. */
 export type LogOutput = 'text' | 'json';
 
+/** What every level method is: the arguments to log, and nothing returned. */
+export type LogMethod = (...msg: any[]) => void;
+
 export interface ILogOptions {
     logInFile?: boolean;
     useColor?: boolean;
@@ -503,28 +506,22 @@ export class Logger {
         this.fileOutput = Helper.mode(given.fileOutput, this.output);
     }
 
-    public info(...msg: any[]): void {
-        this.emit(Helper.levels.info, msg);
-    }
+    public readonly info: LogMethod = this.at('info');
+    public readonly warn: LogMethod = this.at('warn');
+    public readonly trace: LogMethod = this.at('trace');
+    public readonly error: LogMethod = this.at('error');
+    public readonly debug: LogMethod = this.at('debug');
+    public readonly success: LogMethod = this.at('success');
 
-    public warn(...msg: any[]): void {
-        this.emit(Helper.levels.warn, msg);
-    }
+    /**
+     * The six level methods say the same thing about six levels, so they are one
+     * factory rather than six bodies. The built function is its own stack boundary,
+     * which is what keeps the frames a trace captures starting at the caller.
+     */
+    private at(name: string): LogMethod {
+        const method: LogMethod = (...msg: any[]): void => this.emit(Helper.levels[name], msg, method);
 
-    public trace(...msg: any[]): void {
-        this.emit(Helper.levels.trace, msg, this.trace);
-    }
-
-    public error(...msg: any[]): void {
-        this.emit(Helper.levels.error, msg);
-    }
-
-    public debug(...msg: any[]): void {
-        this.emit(Helper.levels.debug, msg);
-    }
-
-    public success(...msg: any[]): void {
-        this.emit(Helper.levels.success, msg);
+        return method;
     }
 
     /** Writes any buffered lines to disk immediately. */

@@ -1,6 +1,8 @@
 export type LogLevel = 'debug' | 'prod';
 /** Line format: the human-readable line, or one JSON object per line. */
 export type LogOutput = 'text' | 'json';
+/** What every level method is: the arguments to log, and nothing returned. */
+export type LogMethod = (...msg: any[]) => void;
 export interface ILogOptions {
     logInFile?: boolean;
     useColor?: boolean;
@@ -27,12 +29,18 @@ export declare class Logger {
     private fdPath;
     private writeErrorReported;
     constructor(options?: ILogOptions);
-    info(...msg: any[]): void;
-    warn(...msg: any[]): void;
-    trace(...msg: any[]): void;
-    error(...msg: any[]): void;
-    debug(...msg: any[]): void;
-    success(...msg: any[]): void;
+    readonly info: LogMethod;
+    readonly warn: LogMethod;
+    readonly trace: LogMethod;
+    readonly error: LogMethod;
+    readonly debug: LogMethod;
+    readonly success: LogMethod;
+    /**
+     * The six level methods say the same thing about six levels, so they are one
+     * factory rather than six bodies. The built function is its own stack boundary,
+     * which is what keeps the frames a trace captures starting at the caller.
+     */
+    private at;
     /** Writes any buffered lines to disk immediately. */
     flush(): void;
     private emit;
