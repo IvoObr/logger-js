@@ -1,6 +1,8 @@
 type ConsoleMethod = 'log' | 'info' | 'warn' | 'error' | 'debug';
 
 interface ILevel {
+    /** Lowercase level name, used as-is by the JSON renderer. */
+    name: string;
     label: string;
     color: string;
     method: ConsoleMethod;
@@ -12,12 +14,32 @@ interface ILevel {
 
 export type LogLevel = 'debug' | 'prod';
 
+/** Line format: the human-readable line, or one JSON object per line. */
+export type LogOutput = 'text' | 'json';
+
 export interface ILogOptions {
     logInFile?: boolean;
     useColor?: boolean;
     fileName?: string;
     /** Only 'debug' unlocks debug output; typed loosely so process.env values fit. */
     logLevel?: LogLevel | (string & {});
+    /** Line format. Defaults to 'text'. */
+    output?: LogOutput;
+    /** Overrides `output` for the file sink only. Defaults to `output`. */
+    fileOutput?: LogOutput;
+}
+
+/**
+ * One log call, captured once and rendered per sink. Holds the arguments as
+ * they were passed rather than a formatted line, so text and JSON each derive
+ * their own shape from the same timestamp, level and frames.
+ */
+interface ILogRecord {
+    level: ILevel;
+    date: Date;
+    args: any[];
+    /** The caller's frames for a trace, '' for every other level. */
+    frames: string;
 }
 
 interface INodeModules {
@@ -34,7 +56,6 @@ interface INodeModules {
  * so every internal reference is qualified with Helper instead.
  */
 class Helper {
-
     private static readonly ESC: string = String.fromCharCode(27);
 
     private static readonly colors = {
@@ -43,23 +64,58 @@ class Helper {
         yellow: `${Helper.ESC}[33m`,
         blue: `${Helper.ESC}[34m`,
         white: `${Helper.ESC}[37m`,
-        cyan: `${Helper.ESC}[36m`
+        cyan: `${Helper.ESC}[36m`,
     };
 
     public static readonly styles = {
         reset: `${Helper.ESC}[0m`,
-        bold: `${Helper.ESC}[1m`
+        bold: `${Helper.ESC}[1m`,
     };
 
-    public static readonly ANSI: RegExp = new RegExp(`${Helper.ESC}\\[[0-9;]*m`, 'g');
+    public static readonly ANSI: RegExp = new RegExp(
+        `${Helper.ESC}\\[[0-9;]*m`,
+        'g'
+    );
 
     public static readonly levels: { [name: string]: ILevel } = {
-        info: { label: 'INFO', color: Helper.colors.white, method: 'info' },
-        warn: { label: 'WARN', color: Helper.colors.yellow, method: 'warn' },
-        error: { label: 'ERROR', color: Helper.colors.red, method: 'error' },
-        trace: { label: 'TRACE', color: Helper.colors.blue, method: 'log', stack: true },
-        debug: { label: 'DEBUG', color: Helper.colors.cyan, method: 'debug', gated: true },
-        success: { label: 'SUCCESS', color: Helper.colors.green, method: 'log' }
+        info: {
+            name: 'info',
+            label: 'INFO',
+            color: Helper.colors.white,
+            method: 'info',
+        },
+        warn: {
+            name: 'warn',
+            label: 'WARN',
+            color: Helper.colors.yellow,
+            method: 'warn',
+        },
+        error: {
+            name: 'error',
+            label: 'ERROR',
+            color: Helper.colors.red,
+            method: 'error',
+        },
+        trace: {
+            name: 'trace',
+            label: 'TRACE',
+            color: Helper.colors.blue,
+            method: 'log',
+            stack: true,
+        },
+        debug: {
+            name: 'debug',
+            label: 'DEBUG',
+            color: Helper.colors.cyan,
+            method: 'debug',
+            gated: true,
+        },
+        success: {
+            name: 'success',
+            label: 'SUCCESS',
+            color: Helper.colors.green,
+            method: 'log',
+        },
     };
 
     private static nodeModules: INodeModules | null | undefined;
@@ -69,7 +125,11 @@ class Helper {
     private static exitHookInstalled: boolean = false;
 
     public static isNode(): boolean {
-        return typeof process !== 'undefined' && !!process.versions && !!process.versions.node;
+        return (
+            typeof process !== 'undefined' &&
+            !!process.versions &&
+            !!process.versions.node
+        );
     }
 
     /**
@@ -83,7 +143,10 @@ class Helper {
                 const fs = require('fs');
                 const path = require('path');
 
-                if (typeof fs.openSync === 'function' && typeof path.join === 'function') {
+                if (
+                    typeof fs.openSync === 'function' &&
+                    typeof path.join === 'function'
+                ) {
                     Helper.nodeModules = { fs: fs, path: path };
                 }
             } catch (error) {
@@ -129,13 +192,20 @@ class Helper {
         }
 
         switch (typeof value) {
-            case 'string': return JSON.stringify(value);
-            case 'number': return Object.is(value, -0) ? '-0' : String(value);
-            case 'boolean': return String(value);
-            case 'undefined': return 'undefined';
-            case 'bigint': return `${value}n`;
-            case 'symbol': return value.toString();
-            case 'function': return `[Function: ${value.name || 'anonymous'}]`;
+            case 'string':
+                return JSON.stringify(value);
+            case 'number':
+                return Object.is(value, -0) ? '-0' : String(value);
+            case 'boolean':
+                return String(value);
+            case 'undefined':
+                return 'undefined';
+            case 'bigint':
+                return `${value}n`;
+            case 'symbol':
+                return value.toString();
+            case 'function':
+                return `[Function: ${value.name || 'anonymous'}]`;
         }
 
         if (seen.indexOf(value) !== -1) {
@@ -145,10 +215,16 @@ class Helper {
         seen.push(value);
         try {
             if (value instanceof Error) {
-                return JSON.stringify(value.stack || `${value.name}: ${value.message}`);
+                return JSON.stringify(
+                    value.stack || `${value.name}: ${value.message}`
+                );
             }
             if (value instanceof Date) {
-                return JSON.stringify(isNaN(value.getTime()) ? 'Invalid Date' : value.toISOString());
+                return JSON.stringify(
+                    isNaN(value.getTime())
+                        ? 'Invalid Date'
+                        : value.toISOString()
+                );
             }
             if (value instanceof RegExp) {
                 return JSON.stringify(String(value));
@@ -159,7 +235,9 @@ class Helper {
             if (value instanceof Map) {
                 const entries: string[] = [];
                 value.forEach((val: any, key: any): void => {
-                    entries.push(`${Helper.stringify(key, seen)}:${Helper.stringify(val, seen)}`);
+                    entries.push(
+                        `${Helper.stringify(key, seen)}:${Helper.stringify(val, seen)}`
+                    );
                 });
                 return `Map(${value.size}) {${entries.join(',')}}`;
             }
@@ -171,18 +249,19 @@ class Helper {
                 return `Set(${value.size}) [${items.join(',')}]`;
             }
 
-            const props: string[] = Object.keys(value).map((key: string): string => {
-                let serialized: string;
-                try {
-                    serialized = Helper.stringify(value[key], seen);
-                } catch (error) {
-                    serialized = '"[Throws]"';
+            const props: string[] = Object.keys(value).map(
+                (key: string): string => {
+                    let serialized: string;
+                    try {
+                        serialized = Helper.stringify(value[key], seen);
+                    } catch (error) {
+                        serialized = '"[Throws]"';
+                    }
+                    return `${JSON.stringify(key)}:${serialized}`;
                 }
-                return `${JSON.stringify(key)}:${serialized}`;
-            });
+            );
 
             return `${Helper.className(value)}{${props.join(',')}}`;
-
         } finally {
             seen.pop();
         }
@@ -198,10 +277,132 @@ class Helper {
                 return value.stack || `${value.name}: ${value.message}`;
             }
             return Helper.stringify(value, []);
-
         } catch (error) {
             return '[Unserializable]';
         }
+    }
+
+    /** JSON has no -0, and no representation at all for NaN or Infinity. */
+    private static jsonNumber(value: number): number | string {
+        if (Object.is(value, -0)) {
+            return 0;
+        }
+
+        return isFinite(value) ? value : String(value);
+    }
+
+    /**
+     * The sibling of stringify that yields a JSON-safe *value* rather than a
+     * display string, with the same guarantees: no depth limit, cycles become
+     * "[Circular]", getters that throw become "[Throws]". Every type JSON cannot
+     * carry gets a documented stand-in, so nothing silently becomes null.
+     */
+    public static jsonValue(value: any, seen: any[]): any {
+        if (value === null) {
+            return null;
+        }
+
+        switch (typeof value) {
+            case 'string':
+                return value;
+            case 'boolean':
+                return value;
+            case 'number':
+                return Helper.jsonNumber(value);
+            case 'undefined':
+                return '[undefined]';
+            case 'bigint':
+                return `${value}n`;
+            case 'symbol':
+                return value.toString();
+            case 'function':
+                return `[Function: ${value.name || 'anonymous'}]`;
+        }
+
+        if (seen.indexOf(value) !== -1) {
+            return '[Circular]';
+        }
+
+        seen.push(value);
+        try {
+            if (value instanceof Error) {
+                return {
+                    type: value.name,
+                    message: value.message,
+                    stack: value.stack || `${value.name}: ${value.message}`,
+                };
+            }
+            if (value instanceof Date) {
+                return isNaN(value.getTime())
+                    ? 'Invalid Date'
+                    : value.toISOString();
+            }
+            if (value instanceof RegExp) {
+                return String(value);
+            }
+            if (Array.isArray(value)) {
+                return value.map((item: any): any =>
+                    Helper.jsonValue(item, seen)
+                );
+            }
+            if (value instanceof Map) {
+                const entries: any[] = [];
+                value.forEach((val: any, key: any): void => {
+                    entries.push([
+                        Helper.jsonValue(key, seen),
+                        Helper.jsonValue(val, seen),
+                    ]);
+                });
+                return { __type: 'Map', entries: entries };
+            }
+            if (value instanceof Set) {
+                const values: any[] = [];
+                value.forEach((item: any): void => {
+                    values.push(Helper.jsonValue(item, seen));
+                });
+                return { __type: 'Set', values: values };
+            }
+
+            // Own enumerable keys only, and no class name: a query language has
+            // nowhere to put one, and the keys are what is worth indexing.
+            const plain: { [key: string]: any } = {};
+
+            Object.keys(value).forEach((key: string): void => {
+                try {
+                    plain[key] = Helper.jsonValue(value[key], seen);
+                } catch (error) {
+                    plain[key] = '[Throws]';
+                }
+            });
+
+            return plain;
+        } finally {
+            seen.pop();
+        }
+    }
+
+    /** One top-level argument, with the same never-throws promise as formatArg. */
+    public static jsonArg(value: any): any {
+        try {
+            return Helper.jsonValue(value, []);
+        } catch (error) {
+            return '[Unserializable]';
+        }
+    }
+
+    /**
+     * Only text lines are ever coloured, so the regex is skipped unless an escape
+     * is actually there - which also keeps a JSON payload's own bytes intact.
+     */
+    public static stripColor(line: string): string {
+        return line.indexOf(Helper.ESC) === -1
+            ? line
+            : line.replace(Helper.ANSI, '');
+    }
+
+    /** Anything that is not one of the two modes falls back, as the other options do. */
+    public static outputMode(value: any, fallback: LogOutput): LogOutput {
+        return value === 'text' || value === 'json' ? value : fallback;
     }
 
     /**
@@ -216,9 +417,13 @@ class Helper {
         }
 
         const stack: string = error.stack || '';
-        const lines: string[] = stack.split('\n').filter((line: string): boolean => /^\s+at\s/.test(line));
+        const lines: string[] = stack
+            .split('\n')
+            .filter((line: string): boolean => /^\s+at\s/.test(line));
 
-        return lines.length > 0 ? lines.join('\n') : stack.split('\n').slice(1).join('\n');
+        return lines.length > 0
+            ? lines.join('\n')
+            : stack.split('\n').slice(1).join('\n');
     }
 
     /**
@@ -230,13 +435,19 @@ class Helper {
             Helper.buffering.push(logger);
         }
 
-        if (Helper.exitHookInstalled || typeof process === 'undefined' || typeof process.once !== 'function') {
+        if (
+            Helper.exitHookInstalled ||
+            typeof process === 'undefined' ||
+            typeof process.once !== 'function'
+        ) {
             return;
         }
 
         Helper.exitHookInstalled = true;
         process.once('exit', (): void => {
-            Helper.buffering.slice().forEach((pending: Logger): void => pending.flush());
+            Helper.buffering
+                .slice()
+                .forEach((pending: Logger): void => pending.flush());
         });
     }
 
@@ -250,12 +461,13 @@ class Helper {
 }
 
 export class Logger {
-
     private readonly useColor: boolean;
     private readonly logInFile: boolean;
     private readonly logLevel: string;
     private readonly baseFileName: string;
     private readonly canWriteFiles: boolean;
+    private readonly output: LogOutput;
+    private readonly fileOutput: LogOutput;
 
     private queue: string[] = [];
     private flushTimer: any;
@@ -268,12 +480,19 @@ export class Logger {
         const node: boolean = Helper.isNode();
 
         this.canWriteFiles = node;
-        this.useColor = typeof options?.useColor === 'boolean' ? options.useColor : node;
-        this.logInFile = typeof options?.logInFile === 'boolean' ? options.logInFile : true;
-        this.logLevel = typeof options?.logLevel === 'string' ? options.logLevel : 'prod';
-        this.baseFileName = typeof options?.fileName === 'string' && options.fileName.trim() !== ''
-            ? options.fileName
-            : 'logger.log';
+        this.useColor =
+            typeof options?.useColor === 'boolean' ? options.useColor : node;
+        this.logInFile =
+            typeof options?.logInFile === 'boolean' ? options.logInFile : true;
+        this.logLevel =
+            typeof options?.logLevel === 'string' ? options.logLevel : 'prod';
+        this.baseFileName =
+            typeof options?.fileName === 'string' &&
+            options.fileName.trim() !== ''
+                ? options.fileName
+                : 'logger.log';
+        this.output = Helper.outputMode(options?.output, 'text');
+        this.fileOutput = Helper.outputMode(options?.fileOutput, this.output);
     }
 
     public info(...msg: any[]): void {
@@ -310,22 +529,90 @@ export class Logger {
             return;
         }
 
-        const body: string = msg.map(Helper.formatArg).join(' ');
-        let line: string = body ? `${this.header(level)} ${body}` : this.header(level);
+        const record: ILogRecord = {
+            level: level,
+            date: new Date(),
+            args: msg,
+            frames: level.stack
+                ? Helper.captureFrames(boundary || this.emit)
+                : '',
+        };
 
-        if (level.stack) {
-            const frames: string = Helper.captureFrames(boundary || this.emit);
-            if (frames) {
-                line += `\n${frames}`;
-            }
+        const line: string = this.render(this.output, record);
+        console[level.method](line);
+
+        if (!this.writesToFile()) {
+            return;
         }
 
-        console[level.method](line);
-        this.writeToFile(line);
+        // Rendered once when both sinks agree, which is every default setup.
+        this.writeToFile(
+            this.fileOutput === this.output
+                ? line
+                : this.render(this.fileOutput, record)
+        );
     }
 
-    private header(level: ILevel): string {
-        const date: Date = new Date();
+    private render(output: LogOutput, record: ILogRecord): string {
+        return output === 'json'
+            ? this.renderJson(record)
+            : this.renderText(record);
+    }
+
+    private renderText(record: ILogRecord): string {
+        const body: string = record.args.map(Helper.formatArg).join(' ');
+        const header: string = this.header(record.level, record.date);
+        const line: string = body ? `${header} ${body}` : header;
+
+        return record.frames ? `${line}\n${record.frames}` : line;
+    }
+
+    /**
+     * One JSON object per line: msg stays a stable string to group by, the rest
+     * stays typed. Falls back to the text line rather than dropping the entry,
+     * since the logger's promise is that it never throws on what you log.
+     */
+    private renderJson(record: ILogRecord): string {
+        try {
+            const json: { [key: string]: any } = {
+                time: record.date.toISOString(),
+                level: record.level.name,
+            };
+
+            const rest: any[] = record.args.slice();
+            const words: string[] = [];
+
+            while (rest.length > 0 && typeof rest[0] === 'string') {
+                words.push(rest.shift());
+            }
+
+            if (words.length > 0) {
+                json.msg = words.join(' ');
+            }
+
+            const at: number = rest.findIndex(
+                (value: any): boolean => value instanceof Error
+            );
+
+            if (at !== -1) {
+                json.err = Helper.jsonValue(rest.splice(at, 1)[0], []);
+            }
+
+            if (rest.length > 0) {
+                json.args = rest.map(Helper.jsonArg);
+            }
+
+            if (record.frames) {
+                json.stack = record.frames;
+            }
+
+            return JSON.stringify(json);
+        } catch (error) {
+            return this.renderText(record);
+        }
+    }
+
+    private header(level: ILevel, date: Date): string {
         const time: string = `[${Helper.localDate(date)} ${Helper.localTime(date)}]`;
 
         return this.useColor
@@ -333,12 +620,12 @@ export class Logger {
             : `${time} ${level.label}:`;
     }
 
-    private writeToFile(line: string): void {
-        if (!this.logInFile || !this.canWriteFiles) {
-            return;
-        }
+    private writesToFile(): boolean {
+        return this.logInFile && this.canWriteFiles;
+    }
 
-        this.queue.push(`${line.replace(Helper.ANSI, '')}\n`);
+    private writeToFile(line: string): void {
+        this.queue.push(`${Helper.stripColor(line)}\n`);
         this.scheduleDrain();
     }
 
@@ -396,7 +683,6 @@ export class Logger {
                 this.drain(false);
                 this.settle();
             });
-
         } catch (error) {
             this.writing = false;
             this.reportWriteError(error);
@@ -405,7 +691,11 @@ export class Logger {
     }
 
     private settle(): void {
-        if (this.queue.length === 0 && !this.writing && this.flushTimer === undefined) {
+        if (
+            this.queue.length === 0 &&
+            !this.writing &&
+            this.flushTimer === undefined
+        ) {
             Helper.untrackBuffering(this);
         }
     }
@@ -458,8 +748,20 @@ export class Logger {
         }
 
         this.writeErrorReported = true;
-        const reason: string = error instanceof Error ? error.message : String(error);
+        const reason: string =
+            error instanceof Error ? error.message : String(error);
 
-        console.error(`${this.header(Helper.levels.error)} logger cannot write to ${this.fdPath || this.baseFileName}: ${reason}`);
+        // Rendered like any other line, so a JSON console stays parseable even
+        // when the sink it is complaining about is the broken one.
+        console.error(
+            this.render(this.output, {
+                level: Helper.levels.error,
+                date: new Date(),
+                args: [
+                    `logger cannot write to ${this.fdPath || this.baseFileName}: ${reason}`,
+                ],
+                frames: '',
+            })
+        );
     }
 }

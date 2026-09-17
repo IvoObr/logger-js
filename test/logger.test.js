@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import { Logger } from '../index.ts';
 import {
+    ESC,
     captureConsole,
     inTempDir,
     localDate,
@@ -651,5 +652,428 @@ describe('options', () => {
         );
 
         assert.match(output, /DEBUG: from env/);
+    });
+});
+
+describe('json output', () => {
+    /** Logs once in JSON mode and returns the parsed console record. */
+    function jsonLine(method, options, ...msg) {
+        const calls = log(method, { output: 'json', ...options }, ...msg);
+
+        assert.equal(calls.length, 1, `${method} did not log once`);
+
+        return JSON.parse(calls[0].args[0]);
+    }
+
+    const arg = (value) => jsonLine('info', {}, 'x', value).args[0];
+
+    it('defaults to the text format', () => {
+        assert.match(
+            line('info', 'hello'),
+            /^\[[\d-]{10} [\d:]{8}\] INFO: hello$/
+        );
+    });
+
+    it('writes one parseable object per line', () => {
+        const calls = log('info', { output: 'json' }, 'one');
+
+        assert.doesNotThrow(() => JSON.parse(calls[0].args[0]));
+        assert.equal(calls[0].args[0].split('\n').length, 1);
+    });
+
+    it('stamps an ISO 8601 time', () => {
+        const { time } = jsonLine('info', {}, 'x');
+
+        assert.match(time, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+        assert.ok(!Number.isNaN(Date.parse(time)));
+    });
+
+    it('names the level in lowercase', () => {
+        for (const level of ['info', 'warn', 'error', 'success', 'trace']) {
+            assert.equal(jsonLine(level, {}, 'x').level, level);
+        }
+
+        assert.equal(
+            jsonLine('debug', { logLevel: 'debug' }, 'x').level,
+            'debug'
+        );
+    });
+
+    it('is never coloured, whatever useColor says', () => {
+        const calls = log('info', { output: 'json', useColor: true }, 'x');
+
+        assert.ok(!hasAnsi(calls[0].args[0]));
+    });
+
+    it('carries a lone message and no args', () => {
+        const record = jsonLine('info', {}, 'hi');
+
+        assert.equal(record.msg, 'hi');
+        assert.ok(!('args' in record));
+    });
+
+    it('joins the leading strings into msg', () => {
+        assert.equal(jsonLine('info', {}, 'a', 'b', 'c').msg, 'a b c');
+    });
+
+    it('splits msg from the rest, in order', () => {
+        const record = jsonLine('info', {}, 'user', { a: 1 }, 'saved');
+
+        assert.equal(record.msg, 'user');
+        assert.deepEqual(record.args, [{ a: 1 }, 'saved']);
+    });
+
+    it('omits msg when the first argument is not a string', () => {
+        const record = jsonLine('info', {}, { a: 1 }, 'trailing');
+
+        assert.ok(!('msg' in record));
+        assert.deepEqual(record.args, [{ a: 1 }, 'trailing']);
+    });
+
+    it('omits msg and args for a bare call', () => {
+        const record = jsonLine('info', {});
+
+        assert.deepEqual(Object.keys(record), ['time', 'level']);
+    });
+
+    it('lifts the first Error out of args', () => {
+        const record = jsonLine('error', {}, new Error('boom'));
+
+        assert.equal(record.err.type, 'Error');
+        assert.equal(record.err.message, 'boom');
+        assert.match(record.err.stack, /\n\s+at /);
+        assert.ok(!('args' in record));
+    });
+
+    it('keeps the message beside the Error it describes', () => {
+        const record = jsonLine(
+            'error',
+            {},
+            'save failed',
+            { id: 7 },
+            new Error('boom')
+        );
+
+        assert.equal(record.msg, 'save failed');
+        assert.equal(record.err.message, 'boom');
+        assert.deepEqual(record.args, [{ id: 7 }]);
+    });
+
+    it('names a subclassed Error by its own name', () => {
+        class HttpError extends Error {
+            constructor() {
+                super('teapot');
+                this.name = 'HttpError';
+            }
+        }
+
+        assert.equal(
+            jsonLine('error', {}, new HttpError()).err.type,
+            'HttpError'
+        );
+    });
+
+    it('leaves a second Error in args', () => {
+        const record = jsonLine(
+            'error',
+            {},
+            new Error('first'),
+            new Error('second')
+        );
+
+        assert.equal(record.err.message, 'first');
+        assert.equal(record.args.length, 1);
+        assert.equal(record.args[0].message, 'second');
+    });
+
+    it('attaches the caller stack to a trace and nothing else', () => {
+        assert.match(jsonLine('trace', {}, 'x').stack, /^\s*at /);
+        assert.ok(!('stack' in jsonLine('info', {}, 'x')));
+    });
+
+    it('keeps the trace stack on one line as an escaped string', () => {
+        const calls = log('trace', { output: 'json' }, 'x');
+
+        assert.equal(calls[0].args[0].split('\n').length, 1);
+        assert.match(JSON.parse(calls[0].args[0]).stack, /\n\s+at /);
+    });
+
+    it('represents the values JSON cannot carry', () => {
+        class Point {
+            constructor() {
+                this.x = 1;
+            }
+        }
+
+        assert.equal(arg(undefined), '[undefined]');
+        assert.equal(arg(9007199254740993n), '9007199254740993n');
+        assert.equal(arg(Symbol('x')), 'Symbol(x)');
+        assert.equal(
+            arg(function named() {}),
+            '[Function: named]'
+        );
+        assert.equal(
+            arg(() => {}),
+            '[Function: anonymous]'
+        );
+        assert.equal(arg(new Date(0)), '1970-01-01T00:00:00.000Z');
+        assert.equal(arg(new Date('nope')), 'Invalid Date');
+        assert.equal(arg(/re/g), '/re/g');
+        assert.deepEqual(arg(new Map([['k', 1]])), {
+            __type: 'Map',
+            entries: [['k', 1]],
+        });
+        assert.deepEqual(arg(new Set([1, 2])), {
+            __type: 'Set',
+            values: [1, 2],
+        });
+        assert.deepEqual(arg(new Point()), { x: 1 });
+        assert.equal(arg(NaN), 'NaN');
+        assert.equal(arg(Infinity), 'Infinity');
+        assert.equal(arg(-Infinity), '-Infinity');
+    });
+
+    it('drops the class name a text line would print', () => {
+        class User {
+            constructor() {
+                this.name = 'ivo';
+            }
+        }
+
+        assert.match(line('info', new User()), /User \{"name":"ivo"\}$/);
+        assert.deepEqual(arg(new User()), { name: 'ivo' });
+    });
+
+    it('flattens -0 to 0, which JSON has no sign for', () => {
+        assert.ok(Object.is(arg(-0), 0));
+        assert.match(line('info', -0), /INFO: -0$/);
+    });
+
+    it('keeps nulls, booleans and numbers typed', () => {
+        const record = jsonLine('info', {}, 'x', null, true, 1.5, 'tail');
+
+        assert.deepEqual(record.args, [null, true, 1.5, 'tail']);
+    });
+
+    it('walks nested values at full depth', () => {
+        assert.deepEqual(arg({ a: { b: { c: [1, { d: new Date(0) }] } } }), {
+            a: { b: { c: [1, { d: '1970-01-01T00:00:00.000Z' }] } },
+        });
+    });
+
+    it('marks a cycle instead of throwing', () => {
+        const circular = { a: 1 };
+        circular.self = circular;
+
+        assert.deepEqual(arg(circular), { a: 1, self: '[Circular]' });
+    });
+
+    it('marks a cycle through an array', () => {
+        const arr = [1];
+        arr.push(arr);
+
+        assert.deepEqual(arg(arr), [1, '[Circular]']);
+    });
+
+    it('repeats a shared object rather than calling it circular', () => {
+        const shared = { n: 1 };
+
+        assert.deepEqual(arg({ a: shared, b: shared }), {
+            a: { n: 1 },
+            b: { n: 1 },
+        });
+    });
+
+    it('marks a getter that throws', () => {
+        const hostile = {
+            get boom() {
+                throw new Error('nope');
+            },
+            ok: 1,
+        };
+
+        assert.deepEqual(arg(hostile), { boom: '[Throws]', ok: 1 });
+    });
+
+    it('marks a value that cannot be walked at all', () => {
+        const proxy = new Proxy(
+            {},
+            {
+                ownKeys() {
+                    throw new Error('nope');
+                },
+            }
+        );
+
+        assert.doesNotThrow(() => log('info', { output: 'json' }, 'x', proxy));
+        assert.equal(arg(proxy), '[Unserializable]');
+    });
+
+    it('falls back to the text line when the record cannot be serialized', () => {
+        const stringify = JSON.stringify;
+        JSON.stringify = () => {
+            throw new Error('no JSON for you');
+        };
+        let output;
+        try {
+            output = log('info', { output: 'json' }, 'fallback')[0].args[0];
+        } finally {
+            JSON.stringify = stringify;
+        }
+
+        assert.match(output, /^\[[\d-]{10} [\d:]{8}\] INFO: fallback$/);
+    });
+
+    it('still gates debug', () => {
+        assert.equal(log('debug', { output: 'json' }, 'hidden').length, 0);
+        assert.equal(
+            log('debug', { output: 'json', logLevel: 'debug' }, 'shown').length,
+            1
+        );
+    });
+
+    it('writes JSON lines to the file', () => {
+        const { contents } = logToFile({ output: 'json' }, (logger) => {
+            logger.info('one');
+            logger.warn('two', { a: 1 });
+        });
+        const lines = contents.trim().split('\n');
+
+        assert.equal(lines.length, 2);
+        assert.equal(JSON.parse(lines[0]).msg, 'one');
+        assert.deepEqual(JSON.parse(lines[1]).args, [{ a: 1 }]);
+    });
+
+    it('gives a text console and a JSON file with fileOutput alone', () => {
+        let printed;
+        const { contents } = logToFile({ fileOutput: 'json' }, (logger) => {
+            const capture = captureConsole();
+            try {
+                logger.info('split', { id: 7 });
+            } finally {
+                capture.restore();
+            }
+            printed = capture.calls[0].args[0];
+        });
+
+        assert.match(
+            printed,
+            /^\[[\d-]{10} [\d:]{8}\] INFO: split \{"id":7\}$/
+        );
+        assert.equal(JSON.parse(contents.trim()).msg, 'split');
+    });
+
+    it('lets output set the file format too', () => {
+        const { contents } = logToFile({ output: 'json' }, (logger) =>
+            logger.info('both')
+        );
+
+        assert.equal(JSON.parse(contents.trim()).msg, 'both');
+    });
+
+    it('keeps a JSON console beside a text file', () => {
+        let printed;
+        const { contents } = logToFile(
+            { output: 'json', fileOutput: 'text' },
+            (logger) => {
+                const capture = captureConsole();
+                try {
+                    logger.info('reversed');
+                } finally {
+                    capture.restore();
+                }
+                printed = capture.calls[0].args[0];
+            }
+        );
+
+        assert.equal(JSON.parse(printed).msg, 'reversed');
+        assert.match(contents, /INFO: reversed\n$/);
+    });
+
+    it('leaves escape codes in a JSON payload alone', () => {
+        // JSON.stringify escapes ESC as \u001b, so the file's ANSI strip never
+        // sees a raw escape and cannot eat a payload that contains one.
+        const painted = `${ESC}[31mred${ESC}[0m`;
+        const { contents } = logToFile(
+            { output: 'json', useColor: true },
+            (logger) => logger.info('x', { painted })
+        );
+        const record = JSON.parse(contents.trim());
+
+        assert.ok(!hasAnsi(contents), 'the raw escape reached the file');
+        assert.equal(record.args[0].painted, painted);
+    });
+
+    it('batches many JSON lines into one file in order', () => {
+        const { contents } = logToFile({ output: 'json' }, (logger) => {
+            for (let i = 0; i < 200; i++) {
+                logger.info('line', i);
+            }
+        });
+        const lines = contents.trim().split('\n');
+
+        assert.equal(lines.length, 200);
+        assert.deepEqual(JSON.parse(lines[0]).args, [0]);
+        assert.deepEqual(JSON.parse(lines[199]).args, [199]);
+    });
+
+    it('flushes JSON lines when the process exits', () => {
+        const output = inChild(`
+            new Logger({ output: 'json' }).info('on exit', { id: 1 });
+            const fs = require('fs');
+            process.on('exit', () => report(fs.readFileSync(logFile(), 'utf8')));
+        `);
+        const record = JSON.parse(output.trim());
+
+        assert.equal(record.msg, 'on exit');
+        assert.deepEqual(record.args, [{ id: 1 }]);
+    });
+
+    it('ignores an output mode it does not know', () => {
+        assert.match(line('info', 'x'), /INFO: x$/);
+        assert.match(
+            log('info', { output: 'yaml' }, 'x')[0].args[0],
+            /INFO: x$/
+        );
+        assert.match(
+            log('info', { output: 'json', fileOutput: 'yaml' }, 'x')[0].args[0],
+            /^\{"time"/
+        );
+    });
+
+    it('reports a write failure as JSON too', () => {
+        inTempDir((dir) => {
+            fs.writeFileSync(path.join(dir, 'blocked'), '');
+            const capture = captureConsole();
+            try {
+                const logger = new Logger({
+                    fileName: 'blocked/app.log',
+                    output: 'json',
+                });
+                logger.info('x');
+                logger.flush();
+            } finally {
+                capture.restore();
+            }
+
+            const errors = capture.calls.filter(
+                (call) => call.method === 'error'
+            );
+
+            assert.equal(errors.length, 1);
+            assert.match(
+                JSON.parse(errors[0].args[0]).msg,
+                /^logger cannot write to /
+            );
+        });
+    });
+
+    it('inherits the file format from output', () => {
+        const { contents } = logToFile(
+            { output: 'json', fileOutput: undefined },
+            (logger) => logger.info('inherited')
+        );
+
+        assert.equal(JSON.parse(contents.trim()).msg, 'inherited');
     });
 });
