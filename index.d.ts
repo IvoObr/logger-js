@@ -1,10 +1,16 @@
 export type LogLevel = 'debug' | 'prod';
+/** Line format: the human-readable line, or one JSON object per line. */
+export type LogOutput = 'text' | 'json';
 export interface ILogOptions {
     logInFile?: boolean;
     useColor?: boolean;
     fileName?: string;
     /** Only 'debug' unlocks debug output; typed loosely so process.env values fit. */
     logLevel?: LogLevel | (string & {});
+    /** Line format. Defaults to 'text'. */
+    output?: LogOutput;
+    /** Overrides `output` for the file sink only. Defaults to `output`. */
+    fileOutput?: LogOutput;
 }
 export declare class Logger {
     private readonly useColor;
@@ -12,6 +18,8 @@ export declare class Logger {
     private readonly logLevel;
     private readonly baseFileName;
     private readonly canWriteFiles;
+    private readonly output;
+    private readonly fileOutput;
     private queue;
     private flushTimer;
     private writing;
@@ -28,6 +36,15 @@ export declare class Logger {
     /** Writes any buffered lines to disk immediately. */
     flush(): void;
     private emit;
+    /** The caller's frames, for the levels that ask for them and only then. */
+    private frames;
+    /**
+     * The rendering this sink asked for. JSON that cannot be built falls back to
+     * the text line, so an entry is never lost to its own serialization.
+     */
+    private render;
+    /** The human-readable line: header, arguments as they were passed, then any stack. */
+    private renderText;
     private header;
     private writeToFile;
     /**
